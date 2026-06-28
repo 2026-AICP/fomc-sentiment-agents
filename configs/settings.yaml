@@ -1,0 +1,15 @@
+# 프로젝트 설정 (코드에 하드코딩하지 않기)
+paths:
+  db: data/fomc.db
+  raw: data/raw
+  text: data/text
+  reports: reports/out
+
+engine:
+  model_tag: dummy          # Phase 3에서 finbert-base 등으로 교체
+  finbert_model: ProsusAI/finbert
+  batch: 16
+  maxlen: 256
+
+aggregate:
+  granularity: [meeting, month]   # 집계 단위 (결정: 회의별 + 월별 병행)

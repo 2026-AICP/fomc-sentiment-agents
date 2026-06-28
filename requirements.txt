@@ -1,0 +1,23 @@
+# Thin-slice(Phase 0~2)는 표준 라이브러리만으로 동작.
+# 아래는 이후 Phase에서 추가될 의존성 (지금은 설치 불필요, 참고용).
+
+# 테스트
+pytest
+
+# Phase 3 — 감성 엔진
+# transformers
+# torch
+
+# Phase 3+ — 수집
+# requests
+# beautifulsoup4
+# pdfminer.six
+
+# Phase 5 — 시장 데이터
+# yfinance
+# pandas
+# fredapi
+
+# Phase 7 — 멀티에이전트
+# langgraph
+# langchain
