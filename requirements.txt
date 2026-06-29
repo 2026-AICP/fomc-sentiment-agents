@@ -5,8 +5,8 @@
 pytest
 
 # Phase 3 — 감성 엔진
-# transformers
-# torch
+transformers
+torch
 
 # Phase 3+ — 수집
 # requests

@@ -4,12 +4,17 @@
 재실행 멱등: 결정적 PK + INSERT OR REPLACE 로 두 번 돌려도 행이 중복되지 않는다.
 """
 import hashlib
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 import db
 from engine.preprocess import split_sentences
-from engine.dummy_sentiment import analyze, MODEL_TAG
+# 엔진 선택: 기본 dummy(테스트 오프라인·결정적), SENTIMENT_ENGINE=finbert 면 진짜 모델
+if os.getenv("SENTIMENT_ENGINE", "dummy").lower() == "finbert":
+    from engine.sentiment import analyze, MODEL_TAG
+else:
+    from engine.dummy_sentiment import analyze, MODEL_TAG
 from index.aggregate import aggregate_meeting
 from reports.report import write_report
 

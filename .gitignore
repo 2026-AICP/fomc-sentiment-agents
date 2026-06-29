@@ -1,8 +1,13 @@
 __pycache__/
 *.pyc
+.DS_Store
 *.db
 data/raw/
 data/text/
 reports/out/
 .venv/
 .pytest_cache/
+
+# 모델 가중치 (419MB) — git 에 올리지 않음. 드롭박스에서 받아 로컬 배치.
+models/
+
