@@ -24,10 +24,11 @@ import os
 from collections import Counter, defaultdict
 
 CLASSES = ["positive", "neutral", "negative"]
+# 라벨 코드 매핑 — 이번 프로젝트 규약: 0=중립, 1=긍정, 2=부정 (모델 라벨 순서와 동일)
 _ALIASES = {
     "positive": "positive", "pos": "positive", "p": "positive", "1": "positive", "긍정": "positive",
     "neutral": "neutral", "neu": "neutral", "n": "neutral", "0": "neutral", "중립": "neutral",
-    "negative": "negative", "neg": "negative", "-1": "negative", "부정": "negative",
+    "negative": "negative", "neg": "negative", "2": "negative", "부정": "negative",
 }
 
 
