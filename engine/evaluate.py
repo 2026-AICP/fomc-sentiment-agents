@@ -36,6 +36,8 @@ def norm(label):
     if label is None:
         return None
     k = str(label).strip().lower()
+    if k.endswith(".0"):   # Numbers/Excel 가 0 -> "0.0" 로 내보내는 경우 대비
+        k = k[:-2]
     return _ALIASES.get(k)
 
 
