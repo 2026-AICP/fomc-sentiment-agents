@@ -20,7 +20,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict
 
-MODEL_TAG = "finbert-finetuned"
+# 온도 보정(temperature scaling): human label 150문장으로 캘리브레이션.
+#   T=1.0 → 원본(과신, ECE 0.257). T=3.1 → 보정(ECE 0.07~0.10, 2-fold CV).
+#   확신도 가중 인덱스가 정직하려면 보정 필요. T=1 로 두면 베이스라인 복원.
+TEMPERATURE = float(os.getenv("FINBERT_TEMPERATURE", "3.1"))
+MODEL_TAG = "finbert-cal" if abs(TEMPERATURE - 1.0) > 1e-6 else "finbert-finetuned"
 
 # 모델 디렉토리: 환경변수 우선, 없으면 저장소 루트의 models/finbert-finetuned/
 _DEFAULT_DIR = Path(__file__).resolve().parents[1] / "models" / "finbert-finetuned"
@@ -52,7 +56,7 @@ def analyze(sentence: str) -> Dict[str, float]:
     inputs = tok(sentence, return_tensors="pt", truncation=True, max_length=256)
     with torch.no_grad():
         logits = model(**inputs).logits
-    probs = torch.softmax(logits, dim=-1)[0].tolist()
+    probs = torch.softmax(logits / TEMPERATURE, dim=-1)[0].tolist()  # 온도 보정
 
     p_neu, p_pos, p_neg = probs[_NEU], probs[_POS], probs[_NEG]
     score = p_pos - p_neg
