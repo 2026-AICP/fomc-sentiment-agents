@@ -61,6 +61,33 @@ def run(fixture_path, date, doc_type="statement",
 
 
 if __name__ == "__main__":
-    fixture = ROOT / "tests" / "fixtures" / "FOMC_2025-01-29_statement.txt"
-    path = run(fixture, "2025-01-29")
-    print("[OK] 보고서 생성:", path)
+    import glob
+    import re
+
+    fixture_dir = ROOT / "tests" / "fixtures"
+    # fixtures 폴더의 모든 성명문 파일을 날짜순으로 찾는다
+    files = sorted(glob.glob(str(fixture_dir / "FOMC_*_statement.txt")))
+
+    if not files:
+        print("[경고] fixtures 폴더에 성명문 파일이 없습니다.")
+    else:
+        print(f"처리 대상: {len(files)}개 회의\n")
+
+    ok, fail = 0, 0
+    for fpath in files:
+        fname = Path(fpath).name
+        # 파일명에서 날짜(YYYY-MM-DD)를 뽑아낸다
+        m = re.search(r"(\d{4}-\d{2}-\d{2})", fname)
+        if not m:
+            print(f"  [건너뜀] 날짜를 못 찾음: {fname}")
+            continue
+        date = m.group(1)
+        try:
+            path = run(Path(fpath), date)
+            print(f"  [OK] {date} → {path}")
+            ok += 1
+        except Exception as e:
+            print(f"  [실패] {date}: {e}")
+            fail += 1
+
+    print(f"\n완료: 성공 {ok}건, 실패 {fail}건")
