@@ -8,9 +8,9 @@ pytest
 transformers
 torch
 
-# Phase 3+ — 수집
-# requests
-# beautifulsoup4
+# Phase 3+ — 수집 (engine/scrape.py)
+requests
+beautifulsoup4
 # pdfminer.six
 
 # Phase 5 — 시장 데이터

@@ -12,8 +12,9 @@ reports/out/
 models/
 
 # 대용량 데이터·생성물 — git 에 올리지 않음 (드롭박스/로컬 관리)
-data/wsj/         # WSJ 원본 CSV (드롭박스)
-data/statements/  # FOMC 성명문 원본 (드롭박스)
-outputs/          # 생성된 인덱스·그림·표
-*.pkl             # 중간 산출물 (기사별 점수 등)
+# (주의: .gitignore 는 인라인 주석 불가 → 패턴만 한 줄에)
+data/wsj/
+data/statements/
+outputs/
+*.pkl
 
