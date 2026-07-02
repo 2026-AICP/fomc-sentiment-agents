@@ -25,6 +25,13 @@ CALENDAR = f"{BASE}/monetarypolicy/fomccalendars.htm"
 LINK_RE = re.compile(r"/newsevents/pressreleases/monetary(\d{8})([a-z])?\.htm")
 HEADERS = {"User-Agent": "Mozilla/5.0 (AICP FOMC research)"}
 DELAY = 1.0   # 요청 간 딜레이(초) — 서버 예의
+# 본문 뒤 자투리(투표기록·미디어문의·이행지침) 시작 표지 — 여기서부터 잘라냄
+TRAILER_MARKERS = (
+    "Voting for the monetary policy action",
+    "Voting against",
+    "For media inquiries",
+    "Implementation Note",
+)
 
 
 def _get(url):
@@ -60,7 +67,10 @@ def fetch_statement(url):
         return ""
     paras = [p.get_text(" ", strip=True) for p in article.find_all("p")]
     paras = [p for p in paras if len(p) > 40]   # 짧은 자투리(날짜·서명 등) 제외
-    return " ".join(paras)
+    text = " ".join(paras)
+    # 본문 뒤 자투리(투표기록·미디어문의·이행지침) 잘라내기 — 가장 먼저 나오는 표지에서 컷
+    cut = min([text.find(m) for m in TRAILER_MARKERS if text.find(m) != -1], default=len(text))
+    return text[:cut].strip()
 
 
 def collect(out_dir="data/statements", limit=3):
