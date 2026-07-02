@@ -11,3 +11,10 @@ reports/out/
 # 모델 가중치 (419MB) — git 에 올리지 않음. 드롭박스에서 받아 로컬 배치.
 models/
 
+# 대용량 데이터·생성물 — git 에 올리지 않음 (드롭박스/로컬 관리)
+# (주의: .gitignore 는 인라인 주석 불가 → 패턴만 한 줄에)
+data/wsj/
+data/statements/
+outputs/
+*.pkl
+

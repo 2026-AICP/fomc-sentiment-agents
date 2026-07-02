@@ -48,12 +48,15 @@ def _load():
     tok = AutoTokenizer.from_pretrained(MODEL_DIR)
     model = AutoModelForSequenceClassification.from_pretrained(MODEL_DIR)
     model.eval()
-    return tok, model, torch
+    # GPU 있으면 GPU, 없으면 CPU 자동 (로컬=CPU / UNIST HPC=GPU 둘 다 동작)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+    return tok, model, torch, device
 
 
 def analyze(sentence: str) -> Dict[str, float]:
-    tok, model, torch = _load()
-    inputs = tok(sentence, return_tensors="pt", truncation=True, max_length=256)
+    tok, model, torch, device = _load()
+    inputs = tok(sentence, return_tensors="pt", truncation=True, max_length=256).to(device)
     with torch.no_grad():
         logits = model(**inputs).logits
     probs = torch.softmax(logits / TEMPERATURE, dim=-1)[0].tolist()  # 온도 보정
