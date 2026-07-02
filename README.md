@@ -12,9 +12,11 @@ S&P500·VIX 등 시장 지표와 비교해 위험·기회 신호와 보고서를
 - **Phase 0~2** ✅ 스캐폴딩 + 더미 엔진 end-to-end
 - **Phase 3** ✅ FinBERT 엔진 통합·검증·캘리브레이션 (`docs/phase3_evaluation.md`)
 - **Phase 4** ✅ 인덱스 집계 방식 비교 + 보정 효과 (`docs/phase4_index.md`)
-- **Phase 5~7** ⬜ 시장 비교·신호·멀티에이전트 (프로토타입/설계 단계)
+- **Phase 5** ✅ 시장 비교(S&P500·VIX) + 톤-반응 정합성 (`docs/phase5_comparison.md`)
+- **Phase 6** ✅ 신호 규칙셋(A·B·C) + 백테스트 + 자동보고서 (`docs/phase6_signals.md`)
+- **Phase 7** ⬜ 멀티에이전트(LangGraph) 승격
 
-설계 문서는 `docs/` 참조: `signal_design.md`(신호 설계), `phase3_evaluation.md`, `phase4_index.md`.
+설계 문서는 `docs/` 참조: `signal_design.md`(신호 설계), `phase6_signals.md`(신호·백테스트 결과), `phase3_evaluation.md`, `phase4_index.md`, `phase5_comparison.md`.
 
 ## 구조
 ```

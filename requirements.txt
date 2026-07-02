@@ -7,6 +7,9 @@ pytest
 # Phase 3 — 감성 엔진
 transformers
 torch
+# ★ Windows+CPU 로컬 검증 조합(참고): torch==2.2.2(+cpu) / transformers==4.40.2 / numpy<2
+#   최신 torch는 Windows에서 VC++ 호환 문제(WinError 1114) 가능 → 위 조합 권장.
+#   UNIST GPU 서버(CUDA 10.2)는 module load conda/pytorch 사용(조합 다름).
 
 # Phase 3+ — 수집 (engine/scrape.py)
 requests
@@ -14,8 +17,8 @@ beautifulsoup4
 # pdfminer.six
 
 # Phase 5 — 시장 데이터
-# yfinance
-# pandas
+yfinance
+pandas
 # fredapi
 
 # Phase 7 — 멀티에이전트

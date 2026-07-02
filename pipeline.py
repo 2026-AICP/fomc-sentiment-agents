@@ -60,17 +60,34 @@ def run(fixture_path, date, doc_type="statement",
     return report_path
 
 
+def _corpus_dir() -> Path:
+    """성명문을 읽어올 폴더 결정 (우선순위).
+
+    1) 환경변수 FOMC_CORPUS_DIR (명시 지정)
+    2) data/statements/ (gitignore된 대량 코퍼스 — 드롭박스 로컬 배치용)
+    3) tests/fixtures/ (git에 커밋된 오프라인 6건 — 기본 폴백)
+    """
+    env = os.getenv("FOMC_CORPUS_DIR")
+    if env:
+        return Path(env)
+    statements = ROOT / "data" / "statements"
+    if statements.is_dir() and any(statements.glob("FOMC_*.txt")):
+        return statements
+    return ROOT / "tests" / "fixtures"
+
+
 if __name__ == "__main__":
     import glob
     import re
 
-    fixture_dir = ROOT / "tests" / "fixtures"
-    # fixtures 폴더의 모든 성명문 파일을 날짜순으로 찾는다
-    files = sorted(glob.glob(str(fixture_dir / "FOMC_*_statement.txt")))
+    corpus_dir = _corpus_dir()
+    # 두 명명 규칙 모두 수용: FOMC_<date>_statement.txt / FOMC_statement_<date>.txt
+    files = sorted(glob.glob(str(corpus_dir / "FOMC_*.txt")))
 
     if not files:
-        print("[경고] fixtures 폴더에 성명문 파일이 없습니다.")
+        print(f"[경고] {corpus_dir} 에 성명문 파일이 없습니다.")
     else:
+        print(f"코퍼스: {corpus_dir}")
         print(f"처리 대상: {len(files)}개 회의\n")
 
     ok, fail = 0, 0
