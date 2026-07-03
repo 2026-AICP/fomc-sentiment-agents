@@ -16,8 +16,9 @@ News & Fed Sentiment Index를 산출하고, S&P500·VIX 등 시장 지표와 비
 - **Phase 6** ✅ 신호 규칙셋(A·B·C) + 백테스트 + 자동보고서 (`docs/phase6_signals.md`)
 - **Phase 7** ✅ 멀티에이전트(LangGraph) — Collector→Fed·News분석→통합(headline)→Market→신호→보고서, 무인 batch 9/9 검증 (`docs/phase7_design.md`)
   - News 축: Marketaux 실시간 뉴스 스크래퍼 + 일별 News 지수(95% CI) + Fed와 통합(headline)
+- **Phase 8** ✅ 스케줄러 · 로깅 · 파이프라인 성공률 (`docs/phase8_ops.md`)
 
-설계 문서는 `docs/` 참조: `phase7_design.md`(멀티에이전트), `news_fed_index.md`(News+Fed 통합), `signal_design.md`(신호 설계), `phase6_signals.md`, `phase3_evaluation.md`, `phase4_index.md`, `phase5_comparison.md`, `gpu_server.md`(GPU 서버).
+설계 문서는 `docs/` 참조: `phase7_design.md`(멀티에이전트), `phase8_ops.md`(운영), `news_fed_index.md`(News+Fed 통합), `signal_design.md`(신호 설계), `phase6_signals.md`, `phase3_evaluation.md`, `phase4_index.md`, `phase5_comparison.md`, `gpu_server.md`(GPU 서버).
 
 ## 구조
 ```
