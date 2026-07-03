@@ -27,10 +27,13 @@ from typing import List, Optional
 # ---------------------------------------------------------------------------
 @dataclass
 class Thresholds:
-    theta_shift: float = 0.20   # A: |이번 톤 - 직전 톤| 이 이상이면 '급변'
-    theta_t: float = 0.05       # B·C: 톤 크기 하한 (Phase5: 톤이 ±0.2 내에 몰림 → 작게 시작)
-    theta_m: float = 0.30       # B: 시장 반응 크기 하한 (%단위, spx_ret_cc 규약과 동일)
-    theta_vix: float = 1.00     # C: VIX 변화 크기 하한 (VIX 포인트)
+    # 데이터 기반 보정 (59개 회의 분포, 2026-07-03 · docs/signal_calibration.md).
+    #   θt·θvix 는 분포와 일치해 유지, θm·θshift 는 분포로 교정.
+    #   민감도: θ 0.5~2.0배 전 구간에서 괴리는 위기·긴축기에 일관 집중(자의성 논란 차단).
+    theta_shift: float = 0.07   # A: |이번 톤 - 직전 톤| (|Δ톤| 상위 ~25%, p75≈0.075). 이전 0.20은 과대→A 잠듦
+    theta_t: float = 0.05       # B·C: 톤 크기 하한 (|톤| p25≈0.056 과 일치, 유지)
+    theta_m: float = 0.80       # B: 시장 반응 하한 %(FOMC일 |S&P%| 중앙값≈0.84). 이전 0.30은 과소→괴리 남발
+    theta_vix: float = 1.00     # C: VIX 변화 하한 (|VIX변화| 중앙값≈0.9 와 근접, 유지)
 
 
 DEFAULT_THRESHOLDS = Thresholds()
