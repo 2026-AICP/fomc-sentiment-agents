@@ -46,7 +46,27 @@ def _signal_section(conn, date: str):
     return lines
 
 
-def write_report(conn, date: str, report_dir) -> Path:
+def _news_section(news, headline):
+    """Phase 7 — News 축·통합(headline) 카드. 에이전트가 값을 넘길 때만 렌더."""
+    if not news and not headline:
+        return []
+    lines = ["", "## 5. News 축 & 통합 (Phase 7)"]
+    if news:
+        lo, hi = news.get("ci_lo"), news.get("ci_hi")
+        ci = (f"(95% CI {lo:+.3f} ~ {hi:+.3f})" if lo == lo and hi == hi
+              else "(CI 계산불가: 표본<2)")     # lo==lo → NaN 판별
+        lines.append(f"- News 지수: {news['conf_weighted']:+.3f} {ci}  |  기사 {news['n_articles']}건")
+    else:
+        lines.append("- News 지수: 해당 기간 실시간 뉴스 없음 (과거 회의 — Fed 단독)")
+    if headline:
+        lines.append(
+            f"- **통합(headline): {headline['headline']:+.3f}**  "
+            f"({headline['method']} — Fed {headline['w_fed']*100:.0f}% · News {headline['w_news']*100:.0f}%)")
+    return lines
+
+
+def write_report(conn, date: str, report_dir, news: dict = None,
+                 headline: dict = None) -> Path:
     report_dir = Path(report_dir)
     report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -99,6 +119,7 @@ def write_report(conn, date: str, report_dir) -> Path:
         )
 
     lines += _signal_section(conn, date)
+    lines += _news_section(news, headline)
 
     out = report_dir / f"report_{date}.md"
     out.write_text("\n".join(lines), encoding="utf-8")

@@ -105,6 +105,29 @@ def build_live_index(csv_path=IN, out=OUT, return_articles=False):
     return (daily, art) if return_articles else daily
 
 
+def index_for_window(csv_path=IN, center=None, before=3, after=1):
+    """center 날짜 전후 [center-before, center+after] 뉴스로 News 지수 산출.
+
+    발표일에 그 회의 주변 뉴스만 모아 지수를 내기 위함. center=None 이면 전체.
+    기사가 없으면 None(예: 과거 회의 — 실시간 뉴스 없음) → 통합 시 Fed-only 로 폴백.
+    반환: {conf_weighted, ci_lo, ci_hi, n_articles} 또는 None.
+    """
+    import pandas as pd
+    df = load_live_news(csv_path)
+    if center is not None:
+        c = pd.to_datetime(center)
+        lo, hi = c - pd.Timedelta(days=before), c + pd.Timedelta(days=after)
+        df = df[(df["dt"] >= lo) & (df["dt"] <= hi)]
+    if len(df) == 0:
+        return None
+    art = score_articles(df).copy()
+    art["w"] = (1 - art["entropy"] / LN3).clip(lower=0)
+    s, w = art["score"].to_numpy(), art["w"].to_numpy()
+    lo_ci, hi_ci = _boot_ci(s, w)
+    return {"conf_weighted": _weighted(s, w), "ci_lo": lo_ci,
+            "ci_hi": hi_ci, "n_articles": int(len(art))}
+
+
 def main():
     import numpy as np
     csv_path = Path(sys.argv[1]) if len(sys.argv) > 1 else IN

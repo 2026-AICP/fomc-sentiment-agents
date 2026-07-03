@@ -30,6 +30,8 @@ from reports.report import write_report
 from analysis.signals import (signal_tone_shift, signal_divergence,
                               signal_tone_vs_vix, grade)
 from analysis import collect_market as cm
+from analysis.news_index_live import index_for_window
+from analysis.headline import combine
 
 if os.getenv("SENTIMENT_ENGINE", "dummy").lower() == "finbert":
     from engine.sentiment import analyze, MODEL_TAG
@@ -45,6 +47,8 @@ class State(TypedDict):
     statement_path: str
     n_sentences: int
     index: dict
+    news: dict
+    headline: dict
     market: dict
     signals: dict
     report_path: str
@@ -105,6 +109,33 @@ def _analyst(state: State) -> State:
     return state
 
 
+# ── ②b News Analyst + Combine (headline) ──
+def news_node(state: State) -> State:
+    """발표일 주변 뉴스로 News 지수 산출 후 Fed 지수와 통합(headline).
+
+    실시간 뉴스가 없으면(과거 회의) News=없음 → headline=Fed 단독 폴백.
+    """
+    date = state["date"]
+    fed = state["index"].get("conf_weighted") if state["index"] else None
+    before = int(os.getenv("NEWS_WINDOW_BEFORE", "3"))
+    after = int(os.getenv("NEWS_WINDOW_AFTER", "1"))
+    try:
+        news = index_for_window(center=date, before=before, after=after)
+    except Exception as e:
+        news = None
+        state["log"].append(f"[news] 뉴스 지수 생략: {str(e)[:35]}")
+    if news:
+        state["news"] = news
+        state["log"].append(f"[news] News {news['conf_weighted']:+.3f} (기사 {news['n_articles']}건)")
+    else:
+        state["log"].append("[news] 해당 기간 실시간 뉴스 없음 → Fed 단독")
+    h = combine(fed, news["conf_weighted"] if news else None)
+    if h:
+        state["headline"] = h
+        state["log"].append(f"[news] headline {h['headline']:+.3f} ({h['method']})")
+    return state
+
+
 # ── ③ Market Comparison ──
 def market_node(state: State) -> State:
     date = state["date"]
@@ -154,7 +185,9 @@ def strategy_node(state: State) -> State:
 # ── ⑤ Reporting ──
 def reporting_node(state: State) -> State:
     conn = db.connect(DB)
-    path = write_report(conn, state["date"], REPORTS)
+    path = write_report(conn, state["date"], REPORTS,
+                        news=state.get("news") or None,
+                        headline=state.get("headline") or None)
     conn.close()
     state["report_path"] = str(path)
     state["log"].append(f"[reporting] {path.name}")
@@ -169,13 +202,14 @@ def _route_after_collect(state: State) -> str:
 def build_graph():
     g = StateGraph(State)
     for name, fn in [("collector", collector_node), ("analyst", analyst_node),
-                     ("market", market_node), ("strategy", strategy_node),
-                     ("reporting", reporting_node)]:
+                     ("news", news_node), ("market", market_node),
+                     ("strategy", strategy_node), ("reporting", reporting_node)]:
         g.add_node(name, fn)
     g.set_entry_point("collector")
     g.add_conditional_edges("collector", _route_after_collect,
                             {"analyst": "analyst", "skip": END})
-    g.add_edge("analyst", "market")
+    g.add_edge("analyst", "news")
+    g.add_edge("news", "market")
     g.add_edge("market", "strategy")
     g.add_edge("strategy", "reporting")
     g.add_edge("reporting", END)
@@ -184,7 +218,8 @@ def build_graph():
 
 def _init_state(date: str) -> dict:
     return {"date": date, "statement_path": "", "n_sentences": 0, "index": {},
-            "market": {}, "signals": {}, "report_path": "", "log": [], "errors": []}
+            "news": {}, "headline": {}, "market": {}, "signals": {},
+            "report_path": "", "log": [], "errors": []}
 
 
 def _discover_local_dates(limit=None):
@@ -244,5 +279,7 @@ if __name__ == "__main__":
         result = app.invoke(_init_state(date))
         for line in result["log"]:
             print(" ", line)
-        print(f"\n최종: {result['n_sentences']}문장 | 등급 {result['signals'].get('grade','?')} "
-              f"| 보고서 {Path(result['report_path']).name if result['report_path'] else '(없음)'}")
+        hl = result.get("headline") or {}
+        hl_str = f" | headline {hl['headline']:+.3f}" if hl else ""
+        print(f"\n최종: {result['n_sentences']}문장 | 등급 {result['signals'].get('grade','?')}"
+              f"{hl_str} | 보고서 {Path(result['report_path']).name if result['report_path'] else '(없음)'}")
