@@ -21,6 +21,6 @@ yfinance
 pandas
 # fredapi
 
-# Phase 7 — 멀티에이전트
-# langgraph
-# langchain
+# Phase 7 — 멀티에이전트 (LangGraph)
+langgraph
+# langchain  # LLM 미사용(규칙기반 확정) → 불필요. 평가서 LLM 요구 시에만
