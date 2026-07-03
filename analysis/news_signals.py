@@ -1,25 +1,31 @@
-"""신호 레이어 (1단계) — 일별 News 감성 신호 (규칙 기반, 시장 불필요).
+"""신호 레이어 — 일별 News 감성 신호 (규칙 기반, LLM 미사용).
 
 일별 News 지수(outputs/news_index_live.csv)를 보고 '알려줄 만한' 순간을 규칙으로 판정.
-전부 순수함수(숫자 in → 판정 out) → 재현·추적 가능, 환각 0 (LLM 미사용).
+전부 순수함수(숫자 in → 판정 out) → 재현·추적 가능, 환각 0.
 목표: 조용한 숫자를 '오늘의 신호'로 (신호 발견·제공).
 
-신호(1단계 — 일별 지수만):
-  · shift      감성 급변 (직전 대비 큰 이동)
-  · extreme    극단값 (최근 N일 최저/최고)
-  · sign_flip  부호 전환 (긍↔부)
-  · [게이트]   신뢰도 낮으면(기사 적음/CI 넓음) '관망' → 헛경보 방지
-(2단계 예정: 뉴스↔시장 괴리 — collect_market 로 일별 S&P/VIX 추가)
+신호:
+  1단계(일별 지수만):
+    · shift      감성 급변 (직전 대비 큰 이동)
+    · extreme    극단값 (최근 N일 최저/최고)
+    · sign_flip  부호 전환 (긍↔부)
+  2단계(+일별 시장, collect_market):
+    · divergence 뉴스↔시장 괴리 ⭐ (뉴스 부호 ≠ 시장 반응 부호)
+  [게이트] 신뢰도 낮으면(기사 적음/CI 넓음) '관망' → 헛경보 방지
+
+등급:  🔴 경고(괴리) · ⚠️ 주의(급변·전환) · 🔵 관심(극단) · 🟢 안정 · ⚪ 관망(신뢰도부족)
 
 실행:  python3 analysis/news_signals.py
 """
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))     # 저장소 루트 → analysis/collect_market import 대비
 NEWS_CSV = ROOT / "outputs" / "news_index_live.csv"
 
 
@@ -31,6 +37,8 @@ class Thresholds:
     extreme_window: int = 10      # 극단값: 최근 N일 창
     min_articles: int = 15        # 신뢰도 게이트: 기사 하한
     ci_max: float = 0.60          # 신뢰도 게이트: CI 폭 상한
+    theta_div_news: float = 0.05  # 괴리: 뉴스 감성 크기 하한
+    theta_div_mkt: float = 0.5    # 괴리: 시장 변동 크기 하한 (% 단위)
 
 
 DEFAULT = Thresholds()
@@ -51,11 +59,11 @@ class Signal:
 @dataclass
 class Alert:
     date: str
-    level: str                    # ⚠️ 주의 / 🔵 관심 / 🟢 안정 / ⚪ 관망
+    level: str
     value: float
     n_articles: int
     signals: List[Signal] = field(default_factory=list)
-    gate_reason: Optional[str] = None   # 관망 사유(신뢰도 부족)
+    gate_reason: Optional[str] = None
 
 
 # ── 개별 신호 (순수함수: 숫자 in → 판정 out) ──
@@ -90,6 +98,21 @@ def signal_sign_flip(prev: Optional[float], today: float, theta: float = DEFAULT
     return Signal("sign_flip", False, "전환 아님")
 
 
+def signal_divergence(news: float, market_ret, th: Thresholds = DEFAULT) -> Signal:
+    """⭐ 뉴스↔시장 괴리: 뉴스 감성 부호 ≠ 시장 반응 부호 (둘 다 충분히 큼)."""
+    if market_ret is None:
+        return Signal("divergence", False, "시장 데이터 없음")
+    ns, ms = _sign(news), _sign(market_ret)
+    big = abs(news) >= th.theta_div_news and abs(market_ret) >= th.theta_div_mkt
+    if ns != 0 and ms != 0 and ns != ms and big:
+        nw = "긍정" if ns > 0 else "부정"
+        mw = "하락" if ms < 0 else "상승"
+        return Signal("divergence", True,
+                      f"⚠️ 괴리 — 뉴스 {nw}({news:+.3f}) vs 시장 {mw}({market_ret:+.2f}%)",
+                      abs(news) * abs(market_ret))
+    return Signal("divergence", False, "괴리 아님")
+
+
 def confident(n_articles: int, ci_lo, ci_hi, th: Thresholds = DEFAULT):
     """신뢰도 게이트: 기사 충분 + CI 충분히 좁으면 (True, '')."""
     if n_articles < th.min_articles:
@@ -99,23 +122,29 @@ def confident(n_articles: int, ci_lo, ci_hi, th: Thresholds = DEFAULT):
     return True, ""
 
 
-# ── 조립: 일별 시계열 → 일별 Alert ──
-def build_alerts(series: List[dict], th: Thresholds = DEFAULT) -> List[Alert]:
-    """series: 시간순 [{date, value, n_articles, ci_lo, ci_hi}, ...]."""
+# ── 조립: 일별 시계열(+시장) → 일별 Alert ──
+def build_alerts(series: List[dict], market: dict = None, th: Thresholds = DEFAULT) -> List[Alert]:
+    """series: 시간순 [{date,value,n_articles,ci_lo,ci_hi}, ...].
+    market(선택): {date: {'spx_ret': %, 'vix_chg': ...}} 있으면 괴리 신호 포함."""
+    market = market or {}
     alerts: List[Alert] = []
     for i, row in enumerate(series):
         today = row["value"]
         prev = series[i - 1]["value"] if i > 0 else None
         window_vals = [r["value"] for r in series[:i + 1]]
+        mret = (market.get(row["date"]) or {}).get("spx_ret")
         sigs = [
             signal_shift(prev, today, th.theta_shift),
             signal_extreme(today, window_vals, th.extreme_window),
             signal_sign_flip(prev, today, th.theta_sign),
+            signal_divergence(today, mret, th),
         ]
         ok, gate = confident(row["n_articles"], row.get("ci_lo"), row.get("ci_hi"), th)
         fired = [s for s in sigs if s.fired]
         if not ok:
             level = "⚪ 관망"
+        elif any(s.name == "divergence" for s in fired):
+            level = "🔴 경고"
         elif any(s.name in ("shift", "sign_flip") for s in fired):
             level = "⚠️ 주의"
         elif fired:
@@ -141,11 +170,33 @@ def load_series(csv=NEWS_CSV) -> List[dict]:
     return out
 
 
+def load_market_daily(dates) -> dict:
+    """뉴스 날짜들의 일별 시장(spx_ret_cc %, vix_chg). 실패/오프라인 시 {} (괴리만 생략)."""
+    dates = [d for d in dates if d]
+    if not dates:
+        return {}
+    try:
+        from analysis import collect_market as cm    # yfinance·인증서 우회는 여기서만
+        import pandas as pd
+        full = cm.compute_derived_global(cm.download_full_range(dates))
+    except Exception as e:
+        print(f"[market] 일별 시장 생략(오프라인?): {str(e)[:45]}")
+        return {}
+    out = {}
+    for ts, r in full.iterrows():
+        d = ts.strftime("%Y-%m-%d")
+        out[d] = {"spx_ret": None if pd.isna(r["spx_ret_cc"]) else float(r["spx_ret_cc"]),
+                  "vix_chg": None if pd.isna(r["vix_chg"]) else float(r["vix_chg"])}
+    return out
+
+
 def main():
     if not NEWS_CSV.exists():
         raise SystemExit(f"News 지수 CSV 없음: {NEWS_CSV}\n먼저 agents/news_scheduler.py 실행")
-    alerts = build_alerts(load_series())
-    print(f"일별 News 신호 {len(alerts)}일 (규칙 기반, LLM 미사용)\n── 오늘의 신호 ──")
+    series = load_series()
+    market = load_market_daily([r["date"] for r in series])
+    alerts = build_alerts(series, market)
+    print(f"\n일별 News 신호 {len(alerts)}일 (규칙 기반, LLM 미사용)\n── 오늘의 신호 ──")
     for a in alerts:
         print(f"{a.level}  [{a.date}]  감성 {a.value:+.3f} (기사 {a.n_articles}건)")
         for s in a.signals:
