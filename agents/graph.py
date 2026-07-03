@@ -30,6 +30,7 @@ from reports.report import write_report
 from analysis.signals import (signal_tone_shift, signal_divergence,
                               signal_tone_vs_vix, grade)
 from analysis import collect_market as cm
+from analysis.analyze_alignment import get_reaction, REACTION_OFFSET
 from analysis.news_index_live import index_for_window
 from analysis.headline import combine
 
@@ -148,10 +149,15 @@ def market_node(state: State) -> State:
         state["log"].append(f"[market] {len(win)}거래일 적재")
     except Exception as e:
         state["log"].append(f"[market] 다운로드 생략(오프라인?): {str(e)[:35]}")
-    row = conn.execute("SELECT spx_ret_cc, vix_chg, vix FROM market WHERE date=?", (date,)).fetchone()
+    # 반응은 검증된 규약(analyze_alignment.get_reaction, 기본 발표+1거래일)과 동일하게 —
+    # 리포트 §4 신호 카드와 항상 일치(부호 불일치 방지). 규약 변경은 REACTION_OFFSET 한 곳.
+    reac = get_reaction(conn, date, offset=REACTION_OFFSET)
+    if reac:
+        rdate, spx, vixc = reac
+        vlv = conn.execute("SELECT vix FROM market WHERE date=?", (rdate,)).fetchone()
+        state["market"] = {"spx_ret_cc": spx, "vix_chg": vixc,
+                           "vix": vlv[0] if vlv else None, "reaction_date": rdate}
     conn.close()
-    if row:
-        state["market"] = {"spx_ret_cc": row[0], "vix_chg": row[1], "vix": row[2]}
     state["log"].append(f"[market] 반응 {state['market'] or '(없음)'}")
     return state
 
