@@ -14,9 +14,10 @@ S&P500·VIX 등 시장 지표와 비교해 위험·기회 신호와 보고서를
 - **Phase 4** ✅ 인덱스 집계 방식 비교 + 보정 효과 (`docs/phase4_index.md`)
 - **Phase 5** ✅ 시장 비교(S&P500·VIX) + 톤-반응 정합성 (`docs/phase5_comparison.md`)
 - **Phase 6** ✅ 신호 규칙셋(A·B·C) + 백테스트 + 자동보고서 (`docs/phase6_signals.md`)
-- **Phase 7** ⬜ 멀티에이전트(LangGraph) 승격
+- **Phase 7** ✅ 무인 멀티에이전트(LangGraph) 파이프라인 (`docs/phase7_design.md`)
+- **Phase 8** ✅ 스케줄러 · 로깅 · 파이프라인 성공률 (`docs/phase8_ops.md`)
 
-설계 문서는 `docs/` 참조: `signal_design.md`(신호 설계), `phase6_signals.md`(신호·백테스트 결과), `phase3_evaluation.md`, `phase4_index.md`, `phase5_comparison.md`.
+설계 문서는 `docs/` 참조: `signal_design.md`(신호 설계), `phase6_signals.md`(신호·백테스트 결과), `phase7_design.md`(멀티에이전트), `phase8_ops.md`(운영), `phase3_evaluation.md`, `phase4_index.md`, `phase5_comparison.md`.
 
 ## 구조
 ```

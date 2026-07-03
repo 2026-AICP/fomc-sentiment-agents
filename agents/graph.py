@@ -241,13 +241,18 @@ def _discover_local_dates(limit=None):
     return out[:limit] if limit else out
 
 
-def orchestrate(dates=None, limit=None, retries=1):
-    """Orchestrator: 여러 회의를 무인 일괄 처리. 실패 시 재시도·계속(배치 안 죽음)."""
+def orchestrate(dates=None, limit=None, retries=1, on_result=None):
+    """Orchestrator: 여러 회의를 무인 일괄 처리. 실패 시 재시도·계속(배치 안 죽음).
+
+    on_result(rec: dict): 회의 1건 끝날 때마다 호출(있으면). Phase 8 로깅용(선택).
+    """
+    import time
     if dates is None:
         dates = _discover_local_dates(limit)
     app = build_graph()
     results = []
     for date in dates:
+        t0 = time.perf_counter()
         last_err = None
         for attempt in range(retries + 1):
             try:
@@ -257,6 +262,12 @@ def orchestrate(dates=None, limit=None, retries=1):
                 status = "ok" if not errs else f"부분오류({len(errs)})"
                 results.append((date, grade, status))
                 print(f"  {date}  등급 {grade:<8} [{status}]")
+                if on_result:
+                    on_result({"date": date, "grade": grade, "status": status,
+                               "ok": not errs, "errors": errs,
+                               "duration_s": round(time.perf_counter() - t0, 2),
+                               "model_tag": MODEL_TAG,
+                               "report": r.get("report_path") or None})
                 last_err = None
                 break
             except Exception as e:                 # 그래프 레벨 실패 → 재시도
@@ -264,8 +275,14 @@ def orchestrate(dates=None, limit=None, retries=1):
                 if attempt < retries:
                     print(f"  {date}  재시도({attempt+1})...")
         if last_err:
-            results.append((date, None, f"실패: {last_err[:30]}"))
+            status = f"실패: {last_err[:30]}"
+            results.append((date, None, status))
             print(f"  {date}  ❌ 실패: {last_err[:40]}")
+            if on_result:
+                on_result({"date": date, "grade": None, "status": status,
+                           "ok": False, "errors": [last_err],
+                           "duration_s": round(time.perf_counter() - t0, 2),
+                           "model_tag": MODEL_TAG, "report": None})
     ok = sum(1 for _, _, s in results if s == "ok")
     print(f"\n무인 처리 완료: {len(results)}건 중 정상 {ok}건")
     return results

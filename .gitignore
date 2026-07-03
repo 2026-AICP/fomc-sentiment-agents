@@ -6,6 +6,7 @@ data/raw/
 data/text/
 reports/out/
 reports/agent_out/
+logs/
 .venv/
 .pytest_cache/
 
