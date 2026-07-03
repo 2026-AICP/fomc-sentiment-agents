@@ -16,6 +16,11 @@ models/
 # (주의: .gitignore 는 인라인 주석 불가 → 패턴만 한 줄에)
 data/wsj/
 data/statements/
+data/news/
 outputs/
 *.pkl
+
+# API 키·비밀 — 절대 커밋 금지
+.newsapi_key
+.env
 
