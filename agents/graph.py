@@ -49,6 +49,7 @@ class State(TypedDict):
     signals: dict
     report_path: str
     log: list
+    errors: list
 
 
 # ── ① Data Collector ──
@@ -66,6 +67,15 @@ def collector_node(state: State) -> State:
 
 # ── ② Sentiment Analyst ──
 def analyst_node(state: State) -> State:
+    try:
+        return _analyst(state)
+    except Exception as e:
+        state["errors"].append(f"analyst: {e}")
+        state["log"].append(f"[analyst] 오류: {str(e)[:40]}")
+        return state
+
+
+def _analyst(state: State) -> State:
     path = Path(state["statement_path"])
     text = path.read_text(encoding="utf-8")
     sha = hashlib.sha256(text.encode()).hexdigest()[:10]
@@ -117,6 +127,9 @@ def market_node(state: State) -> State:
 
 # ── ④ Strategy (신호) ──
 def strategy_node(state: State) -> State:
+    if not state["index"]:
+        state["log"].append("[strategy] 인덱스 없음 → 건너뜀")
+        return state
     date = state["date"]
     tone = state["index"].get("conf_weighted")
     reaction = state["market"].get("spx_ret_cc")
@@ -148,6 +161,11 @@ def reporting_node(state: State) -> State:
     return state
 
 
+def _route_after_collect(state: State) -> str:
+    """성명문을 못 찾으면 이후 단계 건너뛰고 종료 (라우팅)."""
+    return "analyst" if state["statement_path"] else "skip"
+
+
 def build_graph():
     g = StateGraph(State)
     for name, fn in [("collector", collector_node), ("analyst", analyst_node),
@@ -155,7 +173,8 @@ def build_graph():
                      ("reporting", reporting_node)]:
         g.add_node(name, fn)
     g.set_entry_point("collector")
-    g.add_edge("collector", "analyst")
+    g.add_conditional_edges("collector", _route_after_collect,
+                            {"analyst": "analyst", "skip": END})
     g.add_edge("analyst", "market")
     g.add_edge("market", "strategy")
     g.add_edge("strategy", "reporting")
@@ -163,13 +182,67 @@ def build_graph():
     return g.compile()
 
 
-if __name__ == "__main__":
-    date = sys.argv[1] if len(sys.argv) > 1 else "2025-01-29"
+def _init_state(date: str) -> dict:
+    return {"date": date, "statement_path": "", "n_sentences": 0, "index": {},
+            "market": {}, "signals": {}, "report_path": "", "log": [], "errors": []}
+
+
+def _discover_local_dates(limit=None):
+    """로컬 성명문 파일에서 회의 날짜 추출 (data/statements 우선, 없으면 fixtures)."""
+    import re
+    dates = set()
+    for d in (ROOT / "data" / "statements", ROOT / "tests" / "fixtures"):
+        for f in d.glob("FOMC_*.txt"):
+            m = re.search(r"(\d{4}-\d{2}-\d{2})", f.name)
+            if m:
+                dates.add(m.group(1))
+    out = sorted(dates, reverse=True)
+    return out[:limit] if limit else out
+
+
+def orchestrate(dates=None, limit=None, retries=1):
+    """Orchestrator: 여러 회의를 무인 일괄 처리. 실패 시 재시도·계속(배치 안 죽음)."""
+    if dates is None:
+        dates = _discover_local_dates(limit)
     app = build_graph()
-    print(f"엔진: {MODEL_TAG} | 대상 회의: {date}\n── 5-에이전트 흐름 ──")
-    result = app.invoke({"date": date, "statement_path": "", "n_sentences": 0,
-                         "index": {}, "market": {}, "signals": {}, "report_path": "", "log": []})
-    for line in result["log"]:
-        print(" ", line)
-    print(f"\n최종: {result['n_sentences']}문장 | 등급 {result['signals'].get('grade','?')} "
-          f"| 보고서 {Path(result['report_path']).name if result['report_path'] else '(없음)'}")
+    results = []
+    for date in dates:
+        last_err = None
+        for attempt in range(retries + 1):
+            try:
+                r = app.invoke(_init_state(date))
+                grade = r["signals"].get("grade", "—")
+                errs = r["errors"]
+                status = "ok" if not errs else f"부분오류({len(errs)})"
+                results.append((date, grade, status))
+                print(f"  {date}  등급 {grade:<8} [{status}]")
+                last_err = None
+                break
+            except Exception as e:                 # 그래프 레벨 실패 → 재시도
+                last_err = str(e)
+                if attempt < retries:
+                    print(f"  {date}  재시도({attempt+1})...")
+        if last_err:
+            results.append((date, None, f"실패: {last_err[:30]}"))
+            print(f"  {date}  ❌ 실패: {last_err[:40]}")
+    ok = sum(1 for _, _, s in results if s == "ok")
+    print(f"\n무인 처리 완료: {len(results)}건 중 정상 {ok}건")
+    return results
+
+
+if __name__ == "__main__":
+    # 배치(무인 다건):  python3 agents/graph.py --batch [N]
+    if len(sys.argv) > 1 and sys.argv[1] == "--batch":
+        limit = int(sys.argv[2]) if len(sys.argv) > 2 else None
+        print(f"엔진: {MODEL_TAG} | Orchestrator 무인 일괄 처리\n── 회의별 결과 ──")
+        orchestrate(limit=limit)
+    else:
+        # 단건:  python3 agents/graph.py [YYYY-MM-DD]
+        date = sys.argv[1] if len(sys.argv) > 1 else "2025-01-29"
+        app = build_graph()
+        print(f"엔진: {MODEL_TAG} | 대상 회의: {date}\n── 5-에이전트 흐름 ──")
+        result = app.invoke(_init_state(date))
+        for line in result["log"]:
+            print(" ", line)
+        print(f"\n최종: {result['n_sentences']}문장 | 등급 {result['signals'].get('grade','?')} "
+              f"| 보고서 {Path(result['report_path']).name if result['report_path'] else '(없음)'}")
