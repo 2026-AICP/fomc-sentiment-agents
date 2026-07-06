@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from analysis.signals import load_series, build_alerts, Thresholds  # 검증된 신호 엔진 재사용
-from analysis.headline import combine, zstats                      # 검증된 통합(headline) 재사용
+from analysis.headline import combine                             # 검증된 통합(headline) 재사용
 
 # ── 데이터 소스 ──
 CANDIDATE_DBS = [ROOT / "data" / "agent_skeleton.db", ROOT / "data" / "fomc.db"]
@@ -455,30 +455,19 @@ def page_headline(mt, news):
     cw = mt[mt.method == "conf_weighted"]
     news_v = news.iloc[-1].conf_weighted if len(news) else None
 
-    use_z = st.toggle("z-표준화 결합 (척도 차이 보정)", value=False,
-                      help="각 축을 히스토리 평균·표준편차로 표준화 후 결합. "
-                           "표본이 작으면 잠정값 — 전 구간 재추론 후 안정.")
-    # 히스토리로 z 파라미터 산출
-    fed_stats = zstats(cw.index_value.tolist())
-    news_stats = zstats(news.conf_weighted.tolist()) if len(news) else None
+    st.caption("각 축을 전 구간(2000~2026) 평균·표준편차로 z-표준화 후 결합 "
+               "(analysis/headline_norm.json). News(작은 분산)가 Fed에 묻히지 않도록 보정.")
 
     rows = []
     for _, r in cw.iterrows():
-        if use_z:
-            h = combine(r.index_value, news_v, fed_stats=fed_stats, news_stats=news_stats)
-        else:
-            h = combine(r.index_value, news_v)
+        h = combine(r.index_value, news_v)
         rows.append(dict(회의일=r.date, Fed=round(r.index_value, 3),
                          News=round(news_v, 3) if news_v is not None else None,
                          통합=round(h["headline"], 3) if h else None,
                          방식=h["method"] if h else "—"))
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-    if use_z:
-        fs = f"Fed(μ={fed_stats[0]:+.3f}, σ={fed_stats[1]:.3f})" if fed_stats else "Fed(표본부족)"
-        ns = f"News(μ={news_stats[0]:+.3f}, σ={news_stats[1]:.3f})" if news_stats else "News(표본부족)"
-        st.caption(f"z-파라미터: {fs} · {ns}  — ⚠️ 표본 작아 **잠정값**. 전 구간 재추론 후 안정.")
     st.caption("※ 현재 뉴스는 최근 회의 주변에만 존재 → 과거 회의는 fed_only 폴백. "
-               "검증본(docs/news_fed_index.md)에선 z-표준화 50:50 이 VIX 상관 −0.52 로 최선.")
+               "검증본(docs/news_fed_index.md)에선 z-표준화 50:50 이 VIX 상관 −0.534 로 최선.")
 
 
 def page_rates(db, mt):
