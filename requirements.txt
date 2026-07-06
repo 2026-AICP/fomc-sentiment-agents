@@ -1,26 +1,8 @@
-# Thin-slice(Phase 0~2)는 표준 라이브러리만으로 동작.
-# 아래는 이후 Phase에서 추가될 의존성 (지금은 설치 불필요, 참고용).
+# === Streamlit Cloud 배포 전용(브랜치: deploy/streamlit-dashboard) ===
+# 대시보드(dashboard/app.py)는 이미 수집된 DB·CSV만 읽어 표시하므로
+# 무거운 학습/수집 의존성(torch·transformers·yfinance·langgraph)은 불필요.
+# 전체 파이프라인 재현이 필요하면 main 브랜치의 requirements.txt 를 사용하세요.
 
-# 테스트
-pytest
-
-# Phase 3 — 감성 엔진
-transformers
-torch
-# ★ Windows+CPU 로컬 검증 조합(참고): torch==2.2.2(+cpu) / transformers==4.40.2 / numpy<2
-#   최신 torch는 Windows에서 VC++ 호환 문제(WinError 1114) 가능 → 위 조합 권장.
-#   UNIST GPU 서버(CUDA 10.2)는 module load conda/pytorch 사용(조합 다름).
-
-# Phase 3+ — 수집 (engine/scrape.py)
-requests
-beautifulsoup4
-# pdfminer.six
-
-# Phase 5 — 시장 데이터
-yfinance
+streamlit
+altair
 pandas
-# fredapi
-
-# Phase 7 — 멀티에이전트 (LangGraph)
-langgraph
-# langchain  # LLM 미사용(규칙기반 확정) → 불필요. 평가서 LLM 요구 시에만

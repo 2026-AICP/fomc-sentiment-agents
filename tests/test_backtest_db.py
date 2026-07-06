@@ -45,7 +45,7 @@ def test_load_series_joins_tone_and_reaction(tmp_path):
     series = load_series(conn, "conf_weighted", reaction_offset=1)
     assert len(series) == 6
     first = series[0]
-    assert set(first) == {"date", "tone", "confidence", "reaction_ret", "vix_chg"}
+    assert set(first) == {"date", "tone", "confidence", "reaction_ret", "vix_chg", "ust2y_chg"}
     # 반응=발표+1거래일 → 2000-01-05 의 반응은 2000-01-06 의 ret(0.7)
     assert abs(first["reaction_ret"] - 0.7) < 1e-9
 

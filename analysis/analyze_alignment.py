@@ -59,6 +59,28 @@ def get_reaction(con, meeting_date, offset=REACTION_OFFSET):
     return rows[offset]        # offset 번째(0=당일, 1=다음날)
 
 
+def get_ust2y_change(con, meeting_date, offset=REACTION_OFFSET):
+    """반응일의 2년물 국채금리 변화(전 거래일 대비, %p). 데이터 없으면 None.
+
+    2년물은 Fed 정책에 가장 민감한 만기 → '시장이 소화한 금리 서프라이즈'의 대리(proxy).
+    (진짜 Fed Funds 선물 기반 서프라이즈는 무료 데이터 부재로 미구현 — signal_design 참고.)
+    """
+    rows = con.execute(
+        "SELECT date FROM market WHERE date >= ? ORDER BY date LIMIT ?",
+        (meeting_date, offset + 1),
+    ).fetchall()
+    if len(rows) < offset + 1:
+        return None
+    rdate = rows[offset][0]
+    r = con.execute(
+        "SELECT ust2y FROM market WHERE date <= ? AND ust2y IS NOT NULL ORDER BY date DESC LIMIT 2",
+        (rdate,),
+    ).fetchall()
+    if len(r) < 2:
+        return None
+    return r[0][0] - r[1][0]
+
+
 def sign(x):
     """부호만 뽑는다: 양수 +1, 음수 -1, 0은 0."""
     if x is None:

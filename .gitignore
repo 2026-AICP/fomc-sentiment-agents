@@ -23,5 +23,6 @@ outputs/
 
 # API 키·비밀 — 절대 커밋 금지
 .newsapi_key
+.fredapi_key
 .env
 
