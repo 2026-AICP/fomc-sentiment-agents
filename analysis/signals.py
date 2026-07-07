@@ -34,6 +34,7 @@ class Thresholds:
     theta_t: float = 0.05       # B·C: 톤 크기 하한 (|톤| p25≈0.056 과 일치, 유지)
     theta_m: float = 0.80       # B: 시장 반응 하한 %(FOMC일 |S&P%| 중앙값≈0.84). 이전 0.30은 과소→괴리 남발
     theta_vix: float = 1.00     # C: VIX 변화 하한 (|VIX변화| 중앙값≈0.9 와 근접, 유지)
+    theta_rate: float = 0.05    # D: 2년물 금리변화 하한(%p). 발표일 5bp+ 이면 유의미한 반응
 
 
 DEFAULT_THRESHOLDS = Thresholds()
@@ -139,6 +140,29 @@ def signal_tone_vs_vix(tone: Optional[float], vix_chg: Optional[float],
 
 
 # ---------------------------------------------------------------------------
+# 신호 D — 톤↔금리(2년물) 동행 이탈 (Tone vs 2Y)  [서프라이즈 대리]
+#   평소: 매파(부정 톤) → 2년물↑, 완화(긍정 톤) → 2년물↓ (음의 동행).
+#   이탈 = 톤과 2년물변화가 '같은 부호'이고 둘 다 충분히 큼
+#          (긍정 톤인데 금리 급등  또는  부정 톤인데 금리 급락).
+#   근거: 2년물은 정책 민감 만기 → '시장이 소화한 금리 서프라이즈'의 대리.
+# ---------------------------------------------------------------------------
+def signal_tone_vs_rate(tone: Optional[float], ust2y_chg: Optional[float],
+                        theta_t: float = DEFAULT_THRESHOLDS.theta_t,
+                        theta_rate: float = DEFAULT_THRESHOLDS.theta_rate) -> Signal:
+    if tone is None or ust2y_chg is None:
+        return Signal("tone_vs_rate", False, "톤/2년물 데이터 없음", 0.0)
+    ts, rs = sign(tone), sign(ust2y_chg)
+    break_comove = ts != 0 and rs != 0 and ts == rs   # 정상은 음의 동행 → 같은 부호면 이탈
+    big_enough = abs(tone) >= theta_t and abs(ust2y_chg) >= theta_rate
+    if not (break_comove and big_enough):
+        return Signal("tone_vs_rate", False, "금리 동행 유지(또는 크기 미달)", 0.0)
+    tone_word = "긍정" if ts > 0 else "부정"
+    rate_word = "급등" if rs > 0 else "급락"
+    detail = f"⚠️ 금리 동행 이탈 — 톤 {tone_word}인데 2년물 {rate_word}({ust2y_chg:+.2f}%p)"
+    return Signal("tone_vs_rate", True, detail, abs(tone) * abs(ust2y_chg))
+
+
+# ---------------------------------------------------------------------------
 # 종합 등급 — 발동한 신호들을 4등급으로 요약
 #   🔴 경고 : 괴리(B) 발동 — 가장 강한 위험 알림
 #   ⚠️ 주의 : 동행이탈(C) 또는 톤급변(A) 발동
@@ -150,7 +174,7 @@ def grade(signals: List[Signal], tone: Optional[float],
     fired = {s.name for s in signals if s.fired}
     if "divergence" in fired:
         return GRADE_ALERT
-    if "tone_vs_vix" in fired or "tone_shift" in fired:
+    if "tone_vs_vix" in fired or "tone_vs_rate" in fired or "tone_shift" in fired:
         return GRADE_CAUTION
     # 경고 없음 → 톤·반응 방향이 같으면 정합 확인, 아니면 중립
     if sign(tone) != 0 and sign(tone) == sign(reaction_ret):
@@ -179,6 +203,7 @@ def build_alerts(series: List[dict],
             signal_tone_shift(prev_tone, tone, th.theta_shift),
             signal_divergence(tone, reaction, th.theta_t, th.theta_m),
             signal_tone_vs_vix(tone, vix_chg, th.theta_t, th.theta_vix),
+            signal_tone_vs_rate(tone, row.get("ust2y_chg"), th.theta_t, th.theta_rate),
         ]
         g = grade(sigs, tone, reaction)
         note = "참고용·투자조언 아님."
@@ -197,7 +222,7 @@ def build_alerts(series: List[dict],
 #   analyze_alignment 의 검증된 헬퍼(get_meeting_tone/get_reaction)를 재사용.
 # ---------------------------------------------------------------------------
 def load_series(con, agg_method: str = "conf_weighted", reaction_offset: int = 1) -> List[dict]:
-    from analysis.analyze_alignment import get_meeting_tone, get_reaction
+    from analysis.analyze_alignment import get_reaction, get_ust2y_change
 
     rows = con.execute(
         "SELECT date, index_value, confidence FROM meetings "
@@ -210,9 +235,10 @@ def load_series(con, agg_method: str = "conf_weighted", reaction_offset: int = 1
         reac = get_reaction(con, date, reaction_offset)  # (rdate, spx_ret_cc, vix_chg) | None
         ret = reac[1] if reac else None
         vixc = reac[2] if reac else None
+        rate_chg = get_ust2y_change(con, date, reaction_offset)  # 2년물 변화 (신호 D)
         series.append({
             "date": date, "tone": tone, "confidence": conf,
-            "reaction_ret": ret, "vix_chg": vixc,
+            "reaction_ret": ret, "vix_chg": vixc, "ust2y_chg": rate_chg,
         })
     return series
 
