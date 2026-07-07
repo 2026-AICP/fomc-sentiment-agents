@@ -43,7 +43,7 @@ reporting ─ 오늘의 지수·신호 → outputs → (deploy) → 대시보드
 
 - strategy 노드가 신호 **A·B·C·D를 당일(offset=0)** 로 계산: 톤 vs **당일** 시장.
 - `signals.py` 함수는 순수(`tone, market_ret → 판정`)라 일별에 그대로 적용됨.
-- **스케일 분리**: 표시용 index는 z-표준화(headline), **신호 계산용 톤은 raw conf_weighted** — θ가 raw 기준으로 보정됐으므로 raw 유지(θ 재보정 회피).
+- **신호 톤 = 결합(News+Fed) z-지수(headline)** — 검증된 두 축 이점(-0.534)을 신호에 반영(Fed만 쓰면 이점 소실). θ는 결합 척도로 재보정(`COMBINED_THRESHOLDS`: theta_t 0.22, theta_shift 0.95, 데이터 기반; 시장 θ 불변). 표시·신호 모두 결합 지수 사용. (초기 raw-Fed 안은 사용자 검토로 폐기.)
 - **신뢰도 게이트**(기사수·CI, `news_signals`에서) → 저데이터 날 '관망'으로 헛경보 방지.
 - News 전용 extra(extreme/sign_flip)는 선택; 회의 offset=1 백테스트는 분리 보존.
 
