@@ -11,5 +11,10 @@ export PYTHONWARNINGS=ignore TRANSFORMERS_VERBOSITY=error TOKENIZERS_PARALLELISM
 echo "===== $(date '+%Y-%m-%d %H:%M:%S') 뉴스 데일리 자동화 시작 ====="
 python3 agents/news_scheduler.py     # ① 수집 + FinBERT → 일별 News 지수 (+오늘의 감성)
 python3 analysis/daily_index.py      # ② Fed 계단 + 매일 News → 일별 결합(headline)
-python3 analysis/news_signals.py     # ③ 당일(offset=0) 신호 — 뉴스 vs 당일 시장 → outputs/news_signals.csv
+TODAY_ET="$(TZ=America/New_York date +%F)"   # ③ 통합 에이전트 — 미국(ET) 오늘 날짜 기준
+python3 - "$TODAY_ET" <<'PY'
+import sys
+from agents import graph
+graph.orchestrate(dates=[sys.argv[1]])       # 오늘 1건: 신호 A~D(offset=0) → outputs/daily_signals.csv
+PY
 echo "===== $(date '+%Y-%m-%d %H:%M:%S') 완료 ====="
