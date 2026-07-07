@@ -117,6 +117,14 @@ def news_node(state: State) -> State:
     실시간 뉴스가 없으면(과거 회의) News=없음 → headline=Fed 단독 폴백.
     """
     date = state["date"]
+    if not state["index"]:                       # 일별 모드(analyst 건너뜀) → Fed 톤 이월
+        from analysis.analyze_alignment import fed_tone_asof
+        conn = db.connect(DB); db.init_db(conn)
+        carry = fed_tone_asof(conn, date)
+        conn.close()
+        if carry is not None:
+            state["index"] = {"conf_weighted": round(carry, 4)}
+            state["log"].append(f"[news] Fed 이월 {carry:+.3f} (일별 모드)")
     fed = state["index"].get("conf_weighted") if state["index"] else None
     before = int(os.getenv("NEWS_WINDOW_BEFORE", "3"))
     after = int(os.getenv("NEWS_WINDOW_AFTER", "1"))
