@@ -554,10 +554,14 @@ def main():
                         '<div style="font-size:11px;color:#6b727d">FOMC 감성·신호</div></div></div>',
                         unsafe_allow_html=True)
 
-    page = st.sidebar.radio("메뉴", [
-        "📊 대시보드", "🚦 신호", "✦ News 축", "🏛 Fed 축", "🪙 금리 축",
-        "📈 통합 지수", "◷ 백테스트"],
-        label_visibility="collapsed")
+    PAGES = ["📊 대시보드", "🚦 신호", "✦ News 축", "🏛 Fed 축", "🪙 금리 축",
+             "📈 통합 지수", "◷ 백테스트"]
+    # 선택 페이지를 URL(?p=)에 유지 → 60초 자동 리로드 후에도 보던 페이지 그대로
+    _qp = st.query_params.get("p")
+    _idx0 = int(_qp) if (_qp and _qp.isdigit() and int(_qp) < len(PAGES)) else 0
+    page = st.sidebar.radio("메뉴", PAGES, index=_idx0, label_visibility="collapsed")
+    if st.query_params.get("p") != str(PAGES.index(page)):
+        st.query_params["p"] = str(PAGES.index(page))
 
     if st.sidebar.button("🔄 새로고침 (실시간 반영)", use_container_width=True):
         st.cache_data.clear()
