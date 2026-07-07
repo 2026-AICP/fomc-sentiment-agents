@@ -200,9 +200,9 @@ def reporting_node(state: State) -> State:
     return state
 
 
-def _route_after_collect(state: State) -> str:
-    """성명문을 못 찾으면 이후 단계 건너뛰고 종료 (라우팅)."""
-    return "analyst" if state["statement_path"] else "skip"
+def route_after_collect(state: State) -> str:
+    """성명문 있으면 analyst(회의 모드), 없으면 news(일별 모드 — Fed 이월)."""
+    return "analyst" if state["statement_path"] else "news"
 
 
 def build_graph():
@@ -212,8 +212,8 @@ def build_graph():
                      ("strategy", strategy_node), ("reporting", reporting_node)]:
         g.add_node(name, fn)
     g.set_entry_point("collector")
-    g.add_conditional_edges("collector", _route_after_collect,
-                            {"analyst": "analyst", "skip": END})
+    g.add_conditional_edges("collector", route_after_collect,
+                            {"analyst": "analyst", "news": "news"})
     g.add_edge("analyst", "news")
     g.add_edge("news", "market")
     g.add_edge("market", "strategy")
