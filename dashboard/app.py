@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
+from streamlit_autorefresh import st_autorefresh
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -569,10 +569,8 @@ def main():
 
     auto = st.sidebar.checkbox("⏱ 자동 새로고침 (60초)", value=True)
     if auto:
-        # 60초마다 페이지 리로드 → 스크립트 재실행(캐시 ttl 30s라 DB 새로 읽음)
-        components.html(
-            "<script>setTimeout(function(){window.parent.location.reload();},60000);</script>",
-            height=0)
+        # 전체 리로드 대신 세션 유지 rerun → 보던 페이지·상태 그대로 (캐시 ttl 로 DB 재조회)
+        st_autorefresh(interval=60000, key="auto_refresh")
 
     st.sidebar.caption("규칙 기반 · LLM 미사용\n\n모든 수치·신호는 DB·계산에서 직접. 재현·감사 가능. **예측이 아닌 경향.**")
 
