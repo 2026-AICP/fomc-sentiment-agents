@@ -39,7 +39,7 @@ if os.getenv("SENTIMENT_ENGINE", "dummy").lower() == "finbert":
 else:
     from engine.dummy_sentiment import analyze, MODEL_TAG
 
-DB = ROOT / "data" / "agent_skeleton.db"
+DB = ROOT / "data" / "fomc.db"           # 통일 DB — pipeline·signals·collect_market 과 공유(이중 DB 제거)
 REPORTS = ROOT / "reports" / "agent_out"
 DAILY_SIGNALS = ROOT / "outputs" / "daily_signals.csv"
 
