@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -559,14 +558,9 @@ def main():
     # key 로 선택을 session_state 에 보존 → 자동 rerun(60초) 후에도 페이지 유지
     page = st.sidebar.radio("메뉴", PAGES, key="page", label_visibility="collapsed")
 
-    if st.sidebar.button("🔄 새로고침 (실시간 반영)", use_container_width=True):
+    if st.sidebar.button("🔄 새로고침 (최신 데이터 반영)", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
-
-    auto = st.sidebar.checkbox("⏱ 자동 새로고침 (60초)", value=True)
-    if auto:
-        # 전체 리로드 대신 세션 유지 rerun → 보던 페이지·상태 그대로 (캐시 ttl 로 DB 재조회)
-        st_autorefresh(interval=60000, key="auto_refresh")
 
     st.sidebar.caption("규칙 기반 · LLM 미사용\n\n모든 수치·신호는 DB·계산에서 직접. 재현·감사 가능. **예측이 아닌 경향.**")
 
