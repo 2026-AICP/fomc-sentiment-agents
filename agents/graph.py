@@ -41,6 +41,7 @@ else:
 
 DB = ROOT / "data" / "agent_skeleton.db"
 REPORTS = ROOT / "reports" / "agent_out"
+DAILY_SIGNALS = ROOT / "outputs" / "daily_signals.csv"
 
 
 class State(TypedDict):
@@ -200,6 +201,25 @@ def strategy_node(state: State) -> State:
 
 
 # ── ⑤ Reporting ──
+def append_daily_signal(rec: dict, out=None):
+    """일별 신호 1행 누적(같은 날짜는 덮어쓰기). 최신일이 마지막 행 → 대시보드·기록용."""
+    import csv
+    out = Path(out or DAILY_SIGNALS)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    rows = {}
+    if out.exists():
+        for r in csv.DictReader(open(out, encoding="utf-8")):
+            rows[r["date"]] = r
+    rows[rec["date"]] = {"date": rec["date"], "grade": rec["grade"],
+                         "index": round(rec.get("index") or 0.0, 4),
+                         "fired": ";".join(rec.get("fired") or [])}
+    with open(out, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["date", "grade", "index", "fired"])
+        w.writeheader()
+        for d in sorted(rows):
+            w.writerow(rows[d])
+
+
 def reporting_node(state: State) -> State:
     conn = db.connect(DB)
     path = write_report(conn, state["date"], REPORTS,
@@ -207,7 +227,11 @@ def reporting_node(state: State) -> State:
                         headline=state.get("headline") or None)
     conn.close()
     state["report_path"] = str(path)
-    state["log"].append(f"[reporting] {path.name}")
+    append_daily_signal({"date": state["date"],
+                         "grade": state["signals"].get("grade", "—"),
+                         "index": (state["index"] or {}).get("conf_weighted"),
+                         "fired": state["signals"].get("fired", [])})
+    state["log"].append(f"[reporting] {path.name} + daily_signals.csv")
     return state
 
 
