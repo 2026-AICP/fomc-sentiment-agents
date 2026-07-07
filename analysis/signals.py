@@ -39,6 +39,11 @@ class Thresholds:
 
 DEFAULT_THRESHOLDS = Thresholds()
 
+# 결합(News+Fed) 지수용 θ — z-표준화 결합은 척도가 달라(std≈0.80) 데이터로 재보정.
+#   방법론 동일: theta_t=p25|결합|≈0.22, theta_shift=p85|Δ결합|≈0.95 (2000-2021 월별 결합, 잠정).
+#   시장 θ(θm·θvix·θrate)는 시장 척도라 그대로. 통합 에이전트(agents/graph.py)가 사용.
+COMBINED_THRESHOLDS = Thresholds(theta_shift=0.95, theta_t=0.22)
+
 # 종합 등급 라벨 (사용자가 보는 것)
 GRADE_ALIGNED = "🟢 정합"
 GRADE_NEUTRAL = "⚪ 중립"

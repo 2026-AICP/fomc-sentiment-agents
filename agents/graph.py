@@ -27,8 +27,8 @@ import db
 from engine.preprocess import split_sentences
 from index.aggregate import aggregate_meeting
 from reports.report import write_report
-from analysis.signals import (signal_tone_shift, signal_divergence,
-                              signal_tone_vs_vix, signal_tone_vs_rate, grade)
+from analysis.signals import (signal_tone_shift, signal_divergence, signal_tone_vs_vix,
+                              signal_tone_vs_rate, grade, COMBINED_THRESHOLDS)
 from analysis import collect_market as cm
 from analysis.analyze_alignment import get_reaction, get_ust2y_change, REACTION_OFFSET
 from analysis.news_index_live import index_for_window
@@ -178,25 +178,25 @@ def strategy_node(state: State) -> State:
     if not state["index"]:
         state["log"].append("[strategy] 인덱스 없음 → 건너뜀")
         return state
-    date = state["date"]
-    tone = state["index"].get("conf_weighted")
+    # 신호 톤 = 결합(News+Fed) 지수 — 검증된 두 축 이점(-0.534)을 신호에 반영.
+    tone = (state.get("headline") or {}).get("headline")
+    if tone is None:                                  # 결합 없으면 Fed 단독 z 로 폴백
+        tone = (combine(state["index"].get("conf_weighted"), None) or {}).get("headline")
     reaction = state["market"].get("spx_ret_cc")
     vix_chg = state["market"].get("vix_chg")
-    conn = db.connect(DB)
-    prev = conn.execute(
-        "SELECT index_value FROM meetings WHERE method='conf_weighted' "
-        "AND granularity='meeting' AND date<? ORDER BY date DESC LIMIT 1", (date,)).fetchone()
-    conn.close()
-    prev_tone: Optional[float] = prev[0] if prev else None
+    rate_chg = state["market"].get("ust2y_chg")
+    prev_tone = _prev_combined(state["date"])         # 직전 결합 지수 (daily_signals.csv)
 
-    sigs = [signal_tone_shift(prev_tone, tone),
-            signal_divergence(tone, reaction),
-            signal_tone_vs_vix(tone, vix_chg),
-            signal_tone_vs_rate(tone, state["market"].get("ust2y_chg"))]
+    th = COMBINED_THRESHOLDS                           # 결합 척도용 θ (theta_t 0.22, theta_shift 0.95)
+    sigs = [signal_tone_shift(prev_tone, tone, th.theta_shift),
+            signal_divergence(tone, reaction, th.theta_t, th.theta_m),
+            signal_tone_vs_vix(tone, vix_chg, th.theta_t, th.theta_vix),
+            signal_tone_vs_rate(tone, rate_chg, th.theta_t, th.theta_rate)]
     g = grade(sigs, tone, reaction)
     fired = [s.name for s in sigs if s.fired]
     state["signals"] = {"grade": g, "fired": fired}
-    state["log"].append(f"[strategy] 등급 {g} | 발동 {fired or '없음'}")
+    tstr = f"{tone:+.3f}" if tone is not None else "—"
+    state["log"].append(f"[strategy] 등급 {g} (결합톤 {tstr}) | 발동 {fired or '없음'}")
     return state
 
 
@@ -220,6 +220,22 @@ def append_daily_signal(rec: dict, out=None):
             w.writerow(rows[d])
 
 
+def _prev_combined(date, out=None):
+    """date 직전(가장 최근 이전 날)의 결합 지수 — daily_signals.csv. 없으면 None(첫 실행)."""
+    import csv
+    out = Path(out or DAILY_SIGNALS)
+    if not out.exists():
+        return None
+    prev = None
+    for r in csv.DictReader(open(out, encoding="utf-8")):
+        if r.get("date", "") < date:
+            try:
+                prev = float(r["index"])
+            except (KeyError, ValueError, TypeError):
+                pass
+    return prev
+
+
 def reporting_node(state: State) -> State:
     conn = db.connect(DB)
     path = write_report(conn, state["date"], REPORTS,
@@ -229,7 +245,7 @@ def reporting_node(state: State) -> State:
     state["report_path"] = str(path)
     append_daily_signal({"date": state["date"],
                          "grade": state["signals"].get("grade", "—"),
-                         "index": (state["index"] or {}).get("conf_weighted"),
+                         "index": (state.get("headline") or {}).get("headline"),  # 결합(뉴스포함)
                          "fired": state["signals"].get("fired", [])})
     state["log"].append(f"[reporting] {path.name} + daily_signals.csv")
     return state
