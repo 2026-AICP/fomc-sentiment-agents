@@ -449,24 +449,46 @@ def page_fed(db, mt):
             st.dataframe(show, use_container_width=True, hide_index=True)
 
 
+def _news_asof(news, meeting_date, before=3, after=1):
+    """회의일 주변 [−before, +after]일에 실제로 존재하는 뉴스 지수(기사수 가중 평균).
+
+    해당 창에 뉴스가 없으면 None → combine 이 fed_only 로 폴백한다.
+    (검증본 index_for_window 와 같은 −3~+1일 창을 daily CSV 로 근사)
+    """
+    if news is None or not len(news):
+        return None
+    d = pd.to_datetime(meeting_date)
+    nd = news.assign(dt=pd.to_datetime(news["date"]))
+    win = nd[(nd["dt"] >= d - pd.Timedelta(days=before)) & (nd["dt"] <= d + pd.Timedelta(days=after))]
+    if not len(win):
+        return None
+    if "n_articles" in win.columns and win["n_articles"].sum() > 0:
+        return float((win["conf_weighted"] * win["n_articles"]).sum() / win["n_articles"].sum())
+    return float(win["conf_weighted"].mean())
+
+
 def page_headline(mt, news):
     st.markdown("## 통합 지수 (headline)")
     st.caption("Fed 축 + News 축 결합. 뉴스 없으면 Fed 단독 폴백 (검증된 analysis.headline)")
     cw = mt[mt.method == "conf_weighted"]
-    news_v = news.iloc[-1].conf_weighted if len(news) else None
 
     st.caption("각 축을 전 구간(2000~2026) 평균·표준편차로 z-표준화 후 결합 "
-               "(analysis/headline_norm.json). News(작은 분산)가 Fed에 묻히지 않도록 보정.")
+               "(analysis/headline_norm.json). News(작은 분산)가 Fed에 묻히지 않도록 보정. "
+               "뉴스는 각 회의일 주변(−3~+1일)에 **실제 존재하는 것만** 매칭 — 없으면 fed_only.")
 
-    rows = []
+    rows, n_matched = [], 0
     for _, r in cw.iterrows():
+        news_v = _news_asof(news, r.date)      # 회의 날짜별 매칭 (없으면 None)
+        if news_v is not None:
+            n_matched += 1
         h = combine(r.index_value, news_v)
         rows.append(dict(회의일=r.date, Fed=round(r.index_value, 3),
                          News=round(news_v, 3) if news_v is not None else None,
                          통합=round(h["headline"], 3) if h else None,
                          방식=h["method"] if h else "—"))
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-    st.caption("※ 현재 뉴스는 최근 회의 주변에만 존재 → 과거 회의는 fed_only 폴백. "
+    st.caption(f"※ 회의 {len(rows)}건 중 뉴스가 날짜로 매칭된 회의 {n_matched}건(z_weighted), "
+               "나머지는 fed_only 폴백(News 칸 비움). "
                "검증본(docs/news_fed_index.md)에선 z-표준화 50:50 이 VIX 상관 −0.534 로 최선.")
 
 
