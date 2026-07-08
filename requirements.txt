@@ -24,3 +24,9 @@ pandas
 # Phase 7 — 멀티에이전트 (LangGraph)
 langgraph
 # langchain  # LLM 미사용(규칙기반 확정) → 불필요. 평가서 LLM 요구 시에만
+
+# 대시보드 (dashboard/app.py — Streamlit)
+#   ※ Streamlit Cloud 배포는 deploy/streamlit-dashboard 브랜치의 슬림 requirements 사용.
+streamlit
+streamlit-autorefresh
+altair

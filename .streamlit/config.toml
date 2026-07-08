@@ -1,0 +1,11 @@
+# SentiBoard 대시보드 테마 (다크 · 오렌지 강조) — 모든 위젯 통일
+[theme]
+base = "dark"
+primaryColor = "#f9812f"
+backgroundColor = "#0c0e12"
+secondaryBackgroundColor = "#15181e"
+textColor = "#e9ebef"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
