@@ -80,8 +80,9 @@ def test_collect_migrates_old_5col_csv(tmp_path, monkeypatch):
     import engine.news_scrape as ns
     p = _write_csv(tmp_path / "fed_news.csv",
                    ["date", "title", "description", "source", "url"],
-                   [["2026-06-10", "old article", DESC, "wsj.com", "old1"]])
-    new_art = {"date": "2026-06-17", "title": "new article", "description": DESC,
+                   [["2026-06-10", "old Fed article", DESC, "wsj.com", "old1"]])
+    # 제목에 Fed 앵커 포함 → 2a 관련성 필터를 통과(필터는 신규 수집분에만 적용)
+    new_art = {"date": "2026-06-17", "title": "Fed raises interest rates", "description": DESC,
                "source": "reuters.com", "url": "new1",
                "published_at": "2026-06-17T18:30:00.000000Z"}
     monkeypatch.setattr(ns, "discover_news", lambda *a, **k: ([new_art], 1))
