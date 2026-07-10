@@ -31,7 +31,7 @@ from analysis.signals import (signal_tone_shift, signal_divergence, signal_tone_
                               signal_tone_vs_rate, grade, COMBINED_THRESHOLDS)
 from analysis import collect_market as cm
 from analysis.analyze_alignment import get_reaction, get_ust2y_change, REACTION_OFFSET
-from analysis.news_index_live import index_for_window
+from analysis.news_index_live import index_for_window, index_pre_post
 from analysis.headline import combine
 
 if os.getenv("SENTIMENT_ENGINE", "dummy").lower() == "finbert":
@@ -50,6 +50,7 @@ class State(TypedDict):
     n_sentences: int
     index: dict
     news: dict
+    pre_post: dict
     headline: dict
     market: dict
     signals: dict
@@ -143,6 +144,19 @@ def news_node(state: State) -> State:
     if h:
         state["headline"] = h
         state["log"].append(f"[news] headline {h['headline']:+.3f} ({h['method']})")
+    # 2d Step 2: FOMC일이면 성명문(2pm ET) 전/후 뉴스 감성 분리 (시각 있는 수집분에만 유효)
+    if state["statement_path"]:
+        try:
+            pp = index_pre_post(meeting_date=date, after_days=1)
+            state["pre_post"] = pp
+            if pp["shift"] is not None:
+                state["log"].append(
+                    f"[news] 발표 전/후 {pp['pre']['conf_weighted']:+.3f}"
+                    f"→{pp['post']['conf_weighted']:+.3f} (변화 {pp['shift']:+.3f})")
+            elif pp["pre"] or pp["post"]:
+                state["log"].append("[news] 발표 전/후 한쪽 뉴스만 → 변화 계산 불가")
+        except Exception as e:
+            state["log"].append(f"[news] pre/post 생략: {str(e)[:35]}")
     return state
 
 
@@ -240,7 +254,8 @@ def reporting_node(state: State) -> State:
     conn = db.connect(DB)
     path = write_report(conn, state["date"], REPORTS,
                         news=state.get("news") or None,
-                        headline=state.get("headline") or None)
+                        headline=state.get("headline") or None,
+                        pre_post=state.get("pre_post") or None)
     conn.close()
     state["report_path"] = str(path)
     append_daily_signal({"date": state["date"],
@@ -275,7 +290,7 @@ def build_graph():
 
 def _init_state(date: str) -> dict:
     return {"date": date, "statement_path": "", "n_sentences": 0, "index": {},
-            "news": {}, "headline": {}, "market": {}, "signals": {},
+            "news": {}, "pre_post": {}, "headline": {}, "market": {}, "signals": {},
             "report_path": "", "log": [], "errors": []}
 
 
