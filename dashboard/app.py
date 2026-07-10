@@ -526,22 +526,84 @@ def page_rates(db, mt):
 
 
 def page_backtest(alerts):
-    st.markdown("## 백테스트")
-    st.caption("위험사건(발표 후 2일 최대낙폭 상위 1/3) 기준 신호 적중률 — 문서 기준값(188건, 2000–2021)")
-    bt = pd.DataFrame([
-        {"신호": "divergence (괴리)", "발동": 60, "적중률": "48%", "95% CI": "36–61%",
-         "기저율": "34%", "lift": "+15%", "무작위 p": "0.003", "판정": "유의(신호 후보)"},
-        {"신호": "tone_vs_vix", "발동": 32, "적중률": "62%", "95% CI": "45–77%",
-         "기저율": "34%", "lift": "+29%", "무작위 p": "0.000", "판정": "유의(신호 후보)"},
-        {"신호": "tone_shift", "발동": 19, "적중률": "42%", "95% CI": "23–64%",
-         "기저율": "34%", "lift": "+9%", "무작위 p": "0.279", "판정": "구별 어려움"},
-    ])
-    st.dataframe(bt, use_container_width=True, hide_index=True)
-    st.caption(f"현재 DB 신호 분포(라이브): "
-               + ", ".join(f"{k} {v}" for k, v in alerts.grade.value_counts().items())
-               if len(alerts) else "라이브 신호 없음")
-    st.info("전체 재현: `py -m analysis.backtest` (188건 코퍼스 필요). "
-            "현 DB는 최근 회의 표본이라 라이브 백테스트는 표본 부족.")
+    import altair as alt
+    st.markdown('## 괴리 신호 — "지금 자세히 봐야 할 때"')
+    st.caption("괴리는 위기를 **예측**하는 게 아니라, **추가 검토가 필요한 시점**을 "
+               "짚어주는 attention signal 입니다.")
+
+    # ── 괴리란? (평이한 설명) ──
+    st.markdown(
+        f'<div class="kpi" style="margin:2px 0 18px">'
+        f'<div class="eb">괴리(divergence)란?</div>'
+        f'<div style="font-size:15px;line-height:1.65;margin-top:7px;color:{C["ink"]}">'
+        f'연준의 <b>톤</b>과 시장의 <b>반응</b>이 서로 '
+        f'<b style="color:{C["bad"]}">엇갈린</b> 회의입니다.<br>'
+        f'<span style="color:{C["muted"]};font-size:13px">'
+        f'예 · 연준은 안심시키는데 시장은 급락(2020 COVID) &nbsp;/&nbsp; '
+        f'연준은 우려하는데 시장은 안도 랠리(2001 닷컴)</span>'
+        f'</div></div>', unsafe_allow_html=True)
+
+    # ── 핵심 한 줄: 2.4배 ──
+    st.markdown("#### 괴리가 뜨면? — 위기 구간일 확률이 **평소의 2.4배**")
+    cols = st.columns(3)
+    kpi(cols[0], "평소 (위기 아닐 때)",
+        f'<span style="color:{C["muted"]}">18%</span>', "회의의 18%에서만 괴리")
+    kpi(cols[1], "위기 구간에서는",
+        f'<span style="color:{C["bad"]}">42%</span>', "괴리가 2.4배 더 자주",
+        pill="2.4×", pill_color=C["bad"])
+    kpi(cols[2], "우연일 가능성",
+        f'<span style="color:{C["good"]}">0.1%</span>', "permutation p=0.001 · 유의")
+
+    # ── 막대 비교 (평소 vs 위기) ──
+    comp = pd.DataFrame({"구간": ["평소", "위기 구간"], "비율": [18, 42]})
+    bar = alt.Chart(comp).mark_bar(
+        size=96, cornerRadiusTopLeft=5, cornerRadiusTopRight=5).encode(
+        x=alt.X("구간:N", sort=["평소", "위기 구간"],
+                axis=alt.Axis(title=None, labelColor=C["ink"], labelFontSize=14,
+                              domainColor=C["border"])),
+        y=alt.Y("비율:Q", scale=alt.Scale(domain=[0, 50]),
+                axis=alt.Axis(title="괴리 발생 비율 (%)", labelColor=C["muted"],
+                              gridColor=C["border"], domainColor=C["border"])),
+        color=alt.Color("구간:N", scale=alt.Scale(domain=["평소", "위기 구간"],
+                        range=[C["neutral"], C["bad"]]), legend=None),
+        tooltip=[alt.Tooltip("구간:N", title="구간"),
+                 alt.Tooltip("비율:Q", title="괴리 비율(%)", format=".0f")],
+    ).properties(height=230, background="transparent").configure_view(strokeWidth=0)
+    st.altair_chart(bar, use_container_width=True)
+    st.caption("금융스트레스 구간(NBER 침체 + 알려진 위기)에 괴리가 우연보다 2.4배 몰림. "
+               "위기 구간은 신호와 **독립**으로 사전 정의(순환논리 회피). "
+               "검정: permutation p=0.001 · Fisher p<0.001 · `analysis/validate_divergence.py`")
+
+    # ── 대표 사례 (연준 ≠ 시장) ──
+    st.markdown("#### 대표 사례 — 연준 ≠ 시장")
+    ex = [("🦠", "2020-03-15", "COVID 긴급 제로금리", "＋0.10 긍정", "−12.0%"),
+          ("🏦", "2008-10-07", "금융위기 공조 인하", "＋0.11 긍정", "−5.7%"),
+          ("💻", "2001-01-03", "닷컴 긴급인하 → 안도 랠리", "−0.08 부정", "＋5.0%"),
+          ("📉", "2011-08-09", "신용강등 후 저금리 약속", "−0.05 부정", "＋4.7%")]
+    ec = st.columns(2)
+    for i, (icon, when, ctx, fed, mkt) in enumerate(ex):
+        with ec[i % 2].container(border=True):
+            st.markdown(f"{icon} **{when}** · {ctx}")
+            st.caption(f"연준 톤 {fed} &nbsp;↔&nbsp; 시장 당일 {mkt}")
+
+    # ── 기술 통계 (원하는 사람만) ──
+    with st.expander("🔬 통계 자세히 — 신호별 위험사건 동반율 (offset=1 백테스트, 188건)"):
+        st.caption("발표 후 2일 최대낙폭 상위 1/3 = '위험사건'. 각 신호가 그 구간에 얼마나 "
+                   "**동반**되는지 (예측 아닌 연관). 2000–2021.")
+        bt = pd.DataFrame([
+            {"신호": "divergence (괴리)", "발동": 60, "위험사건 동반율": "48%", "95% CI": "36–61%",
+             "평소 기저율": "34%", "차이": "+15%p", "무작위 p": "0.003", "판정": "유의(주목 신호)"},
+            {"신호": "tone_vs_vix", "발동": 32, "위험사건 동반율": "62%", "95% CI": "45–77%",
+             "평소 기저율": "34%", "차이": "+29%p", "무작위 p": "0.000", "판정": "유의(주목 신호)"},
+            {"신호": "tone_shift", "발동": 19, "위험사건 동반율": "42%", "95% CI": "23–64%",
+             "평소 기저율": "34%", "차이": "+9%p", "무작위 p": "0.279", "판정": "구별 어려움"},
+        ])
+        st.dataframe(bt, use_container_width=True, hide_index=True)
+        live = (", ".join(f"{g} {v}" for g, v in alerts.grade.value_counts().items())
+                if len(alerts) else "라이브 신호 없음")
+        st.caption(f"현재 DB 신호 분포(라이브): {live}")
+        st.info("전체 재현: `py -m analysis.backtest` (188건 코퍼스 필요). "
+                "현 DB는 최근 회의 표본이라 라이브 백테스트는 표본 부족.")
 
 
 # ─────────────────────────── 메인 ───────────────────────────
@@ -555,7 +617,7 @@ def main():
                         unsafe_allow_html=True)
 
     PAGES = ["📊 대시보드", "🚦 신호", "✦ News 축", "🏛 Fed 축", "🪙 금리 축",
-             "📈 통합 지수", "◷ 백테스트"]
+             "📈 통합 지수", "🚩 괴리 검증"]
     # key 로 선택을 session_state 에 보존 → 자동 rerun(60초) 후에도 페이지 유지
     page = st.sidebar.radio("메뉴", PAGES, key="page", label_visibility="collapsed")
 
@@ -594,7 +656,7 @@ def main():
         page_rates(db, mt)
     elif page.endswith("통합 지수"):
         page_headline(mt, news)
-    elif page.endswith("백테스트"):
+    elif page.endswith("괴리 검증"):
         page_backtest(alerts)
 
 
