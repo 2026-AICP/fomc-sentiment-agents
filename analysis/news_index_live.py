@@ -60,11 +60,24 @@ def _boot_ci(scores, weights, B=2000, level=95, seed=0):
 
 
 def load_live_news(csv_path):
-    """스크랩 CSV → DataFrame[dt, text]. text = description(20자 이하면 title)."""
+    """스크랩 CSV → DataFrame[dt, text].
+
+    dt: published_at(전체 타임스탬프, 시각 포함) 우선 → 없으면 date(일자)로 폴백(구 CSV 호환).
+        UTC 기준 tz-naive 로 통일(일별 집계·회의 윈도우 비교와 호환). ← 2d 시간대 정밀화
+    text: description(20자 이하면 title).
+    """
     import pandas as pd
     df = pd.read_csv(csv_path, encoding="utf-8-sig")
     df = df[df["date"].notna()].copy()
-    df["dt"] = pd.to_datetime(df["date"], errors="coerce")
+    if "published_at" in df.columns:                        # 시각 있으면 우선, 없으면 date
+        pub = df["published_at"].fillna("").astype(str)
+        raw = pub.where(pub.str.len() >= 10, df["date"].astype(str))
+    else:
+        raw = df["date"].astype(str)
+    # format="ISO8601": date-only('2026-06-17')와 시각포함('...T14:05:00Z')이 섞여도
+    # 각각 파싱(미지정 시 pandas 2.x가 첫 행 포맷을 강제해 date-only 를 NaT로 버림).
+    df["dt"] = pd.to_datetime(raw, errors="coerce", utc=True,
+                              format="ISO8601").dt.tz_localize(None)
     df = df[df["dt"].notna()]
     desc = df["description"].fillna("").astype(str)
     title = df["title"].fillna("").astype(str)

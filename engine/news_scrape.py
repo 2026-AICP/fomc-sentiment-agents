@@ -72,12 +72,14 @@ def _one_page(key, from_date, page):
     arts = []
     for a in data.get("data", []):
         desc = a.get("description") or a.get("snippet") or ""
+        pub = a.get("published_at") or ""                 # ISO 전체 타임스탬프(UTC, 시각 포함)
         arts.append({
-            "date": (a.get("published_at") or "")[:10],   # YYYY-MM-DD
+            "date": pub[:10],                             # YYYY-MM-DD (하위호환)
             "title": a.get("title") or "",
             "description": desc,
             "source": a.get("source") or "",              # 도메인 문자열
             "url": a.get("url") or "",
+            "published_at": pub,                           # 시간대 정밀화(2d): 시각 보존
         })
     found = (data.get("meta") or {}).get("found")
     return arts, found
@@ -101,10 +103,30 @@ def discover_news(days_back=3, pages=5):
     return out, found
 
 
+def _ensure_published_at_column(out):
+    """구 5컬럼 CSV(published_at 없음) → 6컬럼으로 이관. 신행 append 전 정합성 보장.
+
+    이미 있는 fed_news.csv(구 스키마)에 6필드 행을 붙이면 헤더/데이터 컬럼수가 어긋나
+    깨지므로, append 전에 헤더에 published_at 을 더하고 구 행엔 빈값을 채운다(멱등)."""
+    out = Path(out)
+    if not out.exists():
+        return
+    with open(out, encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.reader(f))
+    if not rows or "published_at" in rows[0]:
+        return                                          # 이미 최신 스키마 → no-op
+    with open(out, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f)
+        w.writerow(rows[0] + ["published_at"])          # 헤더 + 새 컬럼
+        for r in rows[1:]:
+            w.writerow(r + [""])                        # 구 행 → 빈 시각(로드 시 date 폴백)
+
+
 def collect(days_back=3, pages=5, out=OUT):
     """뉴스 수집 → CSV 저장 (url 기준 중복 제거, 멱등). WSJ와 동일 컬럼."""
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_published_at_column(out)                    # 구 스키마 자동 이관
     articles, found = discover_news(days_back, pages)
 
     seen = set()
@@ -118,9 +140,10 @@ def collect(days_back=3, pages=5, out=OUT):
     with open(out, "a", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
         if write_header:
-            w.writerow(["date", "title", "description", "source", "url"])
+            w.writerow(["date", "title", "description", "source", "url", "published_at"])
         for a in new:
-            w.writerow([a["date"], a["title"], a["description"], a["source"], a["url"]])
+            w.writerow([a["date"], a["title"], a["description"], a["source"],
+                        a["url"], a["published_at"]])
     return articles, new, found
 
 
