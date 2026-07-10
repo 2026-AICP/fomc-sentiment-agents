@@ -7,6 +7,7 @@ DB(agent_skeleton.db / fomc.db)와 outputs/news_index_live.csv 를 매 실행마
   py -m streamlit run dashboard/app.py
   (한글 경로 인증서 이슈가 있으면 실행 전 CURL_CA_BUNDLE/SSL_CERT_FILE/TEMP 를 ASCII 경로로)
 """
+from __future__ import annotations  # Python 3.9 호환 (Path | None 등 3.10 문법 지연평가)
 import sqlite3
 import sys
 from pathlib import Path
