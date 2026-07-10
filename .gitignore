@@ -21,8 +21,9 @@ outputs/
 *.pkl
 # data/statements/ 는 git 에 포함(공유·재현성) — 성명문은 작은 텍스트(~370KB). WSJ·모델만 제외.
 
-# API 키·비밀 — 절대 커밋 금지
-.newsapi_key
-.fredapi_key
+# API 키·비밀 — 절대 커밋 금지 (오타·백업·변형 사본까지 글롭으로 방어: .fredapi_ke, .fredapi_key.bak 등)
+.newsapi*
+.fredapi*
+*.key
 .env
 
