@@ -118,6 +118,22 @@ def build_live_index(csv_path=IN, out=OUT, return_articles=False):
     return (daily, art) if return_articles else daily
 
 
+def _score_window(df):
+    """DataFrame[dt, text] → {conf_weighted, ci_lo, ci_hi, n_articles} 또는 None(빈 경우).
+
+    한 '창'의 기사들을 FinBERT로 점수화 → 확신도가중 지수 + 부트스트랩 CI + 기사수.
+    index_for_window / index_pre_post 공용 헬퍼.
+    """
+    if len(df) == 0:
+        return None
+    art = score_articles(df).copy()
+    art["w"] = (1 - art["entropy"] / LN3).clip(lower=0)
+    s, w = art["score"].to_numpy(), art["w"].to_numpy()
+    lo_ci, hi_ci = _boot_ci(s, w)
+    return {"conf_weighted": _weighted(s, w), "ci_lo": lo_ci,
+            "ci_hi": hi_ci, "n_articles": int(len(art))}
+
+
 def index_for_window(csv_path=IN, center=None, before=3, after=1):
     """center 날짜 전후 [center-before, center+after] 뉴스로 News 지수 산출.
 
@@ -131,14 +147,43 @@ def index_for_window(csv_path=IN, center=None, before=3, after=1):
         c = pd.to_datetime(center)
         lo, hi = c - pd.Timedelta(days=before), c + pd.Timedelta(days=after)
         df = df[(df["dt"] >= lo) & (df["dt"] <= hi)]
-    if len(df) == 0:
-        return None
-    art = score_articles(df).copy()
-    art["w"] = (1 - art["entropy"] / LN3).clip(lower=0)
-    s, w = art["score"].to_numpy(), art["w"].to_numpy()
-    lo_ci, hi_ci = _boot_ci(s, w)
-    return {"conf_weighted": _weighted(s, w), "ci_lo": lo_ci,
-            "ci_hi": hi_ci, "n_articles": int(len(art))}
+    return _score_window(df)
+
+
+def statement_cutoff_utc(meeting_date, statement_et="14:00"):
+    """FOMC 성명문 발표시각(기본 2pm ET)을 그 날짜의 UTC naive 타임스탬프로 변환.
+
+    ET(America/New_York)는 DST에 따라 EDT(여름 2pm=18:00Z)/EST(겨울 2pm=19:00Z)로 달라지는데
+    pandas tz 변환이 날짜별로 자동 처리. load_live_news 의 dt(naive UTC)와 비교 가능하게 tz 제거.
+    """
+    import pandas as pd
+    d = pd.to_datetime(meeting_date).date()
+    et = pd.Timestamp(f"{d} {statement_et}", tz="America/New_York")
+    return et.tz_convert("UTC").tz_localize(None)
+
+
+def index_pre_post(csv_path=IN, meeting_date=None, statement_et="14:00",
+                   before_days=2, after_days=2):
+    """성명문 발표시각(2pm ET) 기준 직전/직후 뉴스 감성을 각각 산출 (2d Step 2).
+
+    회의 직전(기대 형성)과 직후(반응) 뉴스 흐름을 분리해 '발표 후 감성 변화'를 본다.
+    윈도우: pre = [cutoff-before_days, cutoff), post = [cutoff, cutoff+after_days].
+    반환: {cutoff, pre, post, shift}
+      · pre/post = _score_window 결과({conf_weighted, ci_lo, ci_hi, n_articles}) 또는 None
+      · shift = post.conf_weighted − pre.conf_weighted (양쪽 다 있을 때만, 아니면 None)
+    ※ 시각(published_at)이 있는 수집분에만 유효 — 과거 date-only 기사는 자정으로 몰려 pre 편입.
+    """
+    import pandas as pd
+    if meeting_date is None:
+        raise ValueError("meeting_date 가 필요합니다 (예: '2026-06-17').")
+    cutoff = statement_cutoff_utc(meeting_date, statement_et)
+    df = load_live_news(csv_path)
+    lo = cutoff - pd.Timedelta(days=before_days)
+    hi = cutoff + pd.Timedelta(days=after_days)
+    pre = _score_window(df[(df["dt"] >= lo) & (df["dt"] < cutoff)])
+    post = _score_window(df[(df["dt"] >= cutoff) & (df["dt"] <= hi)])
+    shift = (post["conf_weighted"] - pre["conf_weighted"]) if (pre and post) else None
+    return {"cutoff": cutoff, "pre": pre, "post": post, "shift": shift}
 
 
 def main():
