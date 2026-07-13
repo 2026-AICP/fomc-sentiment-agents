@@ -27,3 +27,8 @@ outputs/
 *.key
 .env
 
+
+# 웹 대시보드 (dashboard-web) — 소스만 커밋, 빌드·의존성·데이터는 재생성
+dashboard-web/node_modules/
+dashboard-web/dist/
+dashboard-web/public/data/
