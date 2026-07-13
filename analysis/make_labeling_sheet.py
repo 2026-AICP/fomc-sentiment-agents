@@ -78,19 +78,45 @@ def sample_sheet(n_total=150, seed=42):
     return picks
 
 
-def main():
-    n_total = int(sys.argv[1]) if len(sys.argv) > 1 else 150
-    out = Path(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_OUT
-    picks = sample_sheet(n_total)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "w", newline="", encoding="utf-8-sig") as fp:
+def split_parts(picks, n_parts, seed=42):
+    """의장 균형 유지하며 n_parts 로 분할(문장 안 겹침). 각 파트는 앵커링 방지로 섞음."""
+    by_chair = {}
+    for p in picks:
+        by_chair.setdefault(p[0], []).append(p)
+    parts = [[] for _ in range(n_parts)]
+    for items in by_chair.values():              # 의장별 라운드로빈 → 각 파트에 골고루
+        for i, it in enumerate(items):
+            parts[i % n_parts].append(it)
+    for k, pt in enumerate(parts):
+        random.Random(seed + k).shuffle(pt)      # 의장 섞기(앵커링 방지)
+    return parts
+
+
+def _write(path: Path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8-sig") as fp:
         w = csv.writer(fp)
         w.writerow(["id", "chair", "sentence", "label_A", "label_B", "notes"])
-        for c, date, idx, s in picks:
+        for c, date, idx, s in rows:
             w.writerow([f"{date}_presconf#{idx}", c, s, "", "", ""])
-    print(f"라벨링 시트 {len(picks)}문장 → {out}")
-    print("의장별:", dict(Counter(c for c, *_ in picks)))
-    print("작성법: label_A·label_B 에 0(중립)/1(긍정)/2(부정) 기입 → 2인 독립 후 합의(kappa).")
+
+
+def main():
+    n_total = int(sys.argv[1]) if len(sys.argv) > 1 else 150
+    n_parts = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+    outdir = DEFAULT_OUT.parent
+    picks = sample_sheet(n_total)
+    if n_parts <= 1:
+        _write(outdir / f"presser_labeling_sheet_{n_total}.csv", picks)
+        print(f"라벨링 시트 {len(picks)}문장 → presser_labeling_sheet_{n_total}.csv")
+        print("의장별:", dict(Counter(c for c, *_ in picks)))
+        return
+    for k, pt in enumerate(split_parts(picks, n_parts), 1):
+        _write(outdir / f"presser_labeling_part{k}_{len(pt)}.csv", pt)
+        print(f"파트 {k}: {len(pt)}문장 → presser_labeling_part{k}_{len(pt)}.csv "
+              f"| 의장별 {dict(Counter(c for c, *_ in pt))}")
+    print(f"→ {n_parts}조가 각 파트를 맡음. 조 안에서 2명이 label_A·label_B 독립 라벨.")
+    print("  파트끼리 문장 안 겹침(합치면 전체). 0(중립)/1(긍정)/2(부정).")
 
 
 if __name__ == "__main__":
