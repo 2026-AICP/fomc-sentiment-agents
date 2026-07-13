@@ -104,21 +104,34 @@ def _one_page(key, from_date, page):
     return arts, found
 
 
-def discover_news(days_back=3, pages=5):
-    """최근 days_back 일의 Fed 관련 기사 → ([{date,title,description,source,url}, ...], found).
+def discover_news(days_back=3, pages=5, retries=2):
+    """최근 days_back 일의 Fed 관련 기사 → ([{date,title,description,source,url,published_at}, ...], found).
 
     무료 티어(요청당 3건)라 pages 쪽까지 이어받아 모은다(최대 pages*3건).
+
+    견고화(CI 안정성): 페이지별 일시 오류(429·네트워크)는 backoff 재시도하고,
+    그래도 실패하면 **그때까지 모은 기사를 유지한 채 중단**한다 — 한 페이지 실패로
+    수집 전체가 전멸(예외 전파)하던 것을 방지. 빈 페이지는 결과 소진으로 보고 정상 종료.
     """
     key = _api_key()
     from_dt = datetime.now(timezone.utc) - timedelta(days=days_back)
     from_date = from_dt.strftime("%Y-%m-%dT%H:%M")
     out, found = [], None
     for p in range(1, pages + 1):
-        arts, found = _one_page(key, from_date, p)
-        if not arts:
+        for attempt in range(retries + 1):
+            try:
+                arts, found = _one_page(key, from_date, p)
+                break
+            except RuntimeError as e:
+                if attempt < retries:
+                    time.sleep(0.8 * (attempt + 1))          # 지수 backoff 후 재시도
+                else:                                        # 재시도 소진 → 부분수집 보존, 중단
+                    print(f"  ⚠ page {p} 실패({str(e)[:45]}) — 지금까지 {len(out)}건 유지하고 중단")
+                    return out, found
+        if not arts:                                         # 빈 페이지 = 결과 소진 → 정상 종료
             break
         out.extend(arts)
-        time.sleep(0.4)            # 폴라이트(무료 티어 속도제한 여유)
+        time.sleep(0.4)                                      # 폴라이트(무료 티어 속도제한 여유)
     return out, found
 
 
@@ -147,6 +160,8 @@ def collect(days_back=3, pages=5, out=OUT):
     out.parent.mkdir(parents=True, exist_ok=True)
     _ensure_published_at_column(out)                    # 구 스키마 자동 이관
     raw, found = discover_news(days_back, pages)
+    if not raw:                                         # CI 가시성: 0건이면 조용히 넘어가지 말 것
+        print("  ⚠ 수집 0건 — API 키/네트워크/쿼터 확인 필요 (뉴스 갱신 안 됨)")
     articles = [a for a in raw if is_relevant(a["title"], a["description"])]   # 2a 관련성 필터
 
     seen = set()
