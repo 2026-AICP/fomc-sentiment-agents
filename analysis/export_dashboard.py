@@ -77,13 +77,21 @@ def export_daily_signals():
             for r in _csv_rows(ROOT / "outputs" / "daily_signals.csv")]
 
 
-def export_market(con):
+def export_market(con, step=5):
+    """시장 시계열 — 차트용 주단위 다운샘플(매 5거래일) + 마지막 행은 항상 포함(최신 KPI).
+
+    일별 2,383포인트를 그대로 주면 차트 폭(수백 px)에 픽셀당 6포인트가 눌려
+    안티앨리어싱으로 선이 뭉개짐 → ~480포인트로 썸(표시 충실도 유지)."""
     rows = con.execute(
         "SELECT date, spx_close, spx_ret_cc, vix, vix_chg, ust2y, ust10y "
         "FROM market WHERE spx_close IS NOT NULL ORDER BY date").fetchall()
+    keep = rows[::step]
+    if rows and keep[-1] is not rows[-1]:
+        keep.append(rows[-1])                      # 최신 행 보존 (KPI 정확성)
     return [{"date": d, "spx": _f(s, 2), "spx_ret": _f(sr, 3), "vix": _f(v, 2),
-             "vix_chg": _f(vc, 2), "ust2y": _f(u2, 2), "ust10y": _f(u10, 2)}
-            for d, s, sr, v, vc, u2, u10 in rows]
+             "vix_chg": _f(vc, 2), "ust2y": _f(u2, 2), "ust10y": _f(u10, 2),
+             "spread": _f(u10 - u2, 2) if u2 is not None and u10 is not None else None}
+            for d, s, sr, v, vc, u2, u10 in keep]
 
 
 def export_presser():

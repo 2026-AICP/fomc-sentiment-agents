@@ -26,7 +26,8 @@ export function IndexArea({ data, x = "date", y, color = "var(--accent)", height
         <Tooltip {...TIP} />
         <ReferenceLine y={0} stroke="#9aa2ad" strokeDasharray="4 4" opacity={0.5} />
         <Area type="monotone" dataKey={y} stroke={color} strokeWidth={2.2}
-          fill={`url(#g-${y})`} dot={{ r: 2.5, fill: color }} />
+          fill={`url(#g-${y})`}
+          dot={data.length > 120 ? false : { r: 2.5, fill: color }} />
       </AreaChart>
     </ResponsiveContainer>
   );

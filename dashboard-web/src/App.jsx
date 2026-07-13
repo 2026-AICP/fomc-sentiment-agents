@@ -2,6 +2,7 @@ import { useState } from "react";
 import Overview from "./pages/Overview";
 import Signals from "./pages/Signals";
 import News from "./pages/News";
+import Market from "./pages/Market";
 import Divergence from "./pages/Divergence";
 import Presser from "./pages/Presser";
 import Method from "./pages/Method";
@@ -10,6 +11,7 @@ const PAGES = [
   { key: "overview", label: "📊 대시보드", el: <Overview /> },
   { key: "signals", label: "🚦 신호", el: <Signals /> },
   { key: "news", label: "✦ News 축", el: <News /> },
+  { key: "market", label: "🪙 시장 축", el: <Market /> },
   { key: "divergence", label: "🚩 괴리 검증", el: <Divergence /> },
   { key: "presser", label: "🎙 기자회견", el: <Presser /> },
   { key: "method", label: "🔬 방법론·한계", el: <Method /> },
