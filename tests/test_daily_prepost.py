@@ -21,6 +21,7 @@ def test_news_node_computes_prepost_on_fomc_day(monkeypatch):
     state["index"] = {"conf_weighted": 0.30}              # analyst 결과 있음(DB 불필요)
     monkeypatch.setattr(graph, "index_for_window", lambda **kw: None)
     monkeypatch.setattr(graph, "index_pre_post", lambda **kw: FAKE_PP)
+    monkeypatch.setattr(graph, "has_presser", lambda d: False)   # presser 블록 격리
     out = graph.news_node(state)
     assert out["pre_post"]["shift"] == 0.30
     assert any("발표 전/후" in l for l in out["log"])

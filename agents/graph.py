@@ -32,6 +32,7 @@ from analysis.signals import (signal_tone_shift, signal_divergence, signal_tone_
 from analysis import collect_market as cm
 from analysis.analyze_alignment import get_reaction, get_ust2y_change, REACTION_OFFSET
 from analysis.news_index_live import index_for_window, index_pre_post
+from analysis.presser_index import presser_tone, has_presser
 from analysis.headline import combine
 
 if os.getenv("SENTIMENT_ENGINE", "dummy").lower() == "finbert":
@@ -51,6 +52,7 @@ class State(TypedDict):
     index: dict
     news: dict
     pre_post: dict
+    presser: dict
     headline: dict
     market: dict
     signals: dict
@@ -157,6 +159,20 @@ def news_node(state: State) -> State:
                 state["log"].append("[news] 발표 전/후 한쪽 뉴스만 → 변화 계산 불가")
         except Exception as e:
             state["log"].append(f"[news] pre/post 생략: {str(e)[:35]}")
+    # #4 Step 3(B1): FOMC일 & presser 트랜스크립트 있으면 성명문 vs presser 톤 괴리
+    # (트랜스크립트는 회의 며칠 후 게시 → 그때 재실행 때 잡힘. 성명문과 같은 analyze 로 공정 비교.)
+    if state["statement_path"] and has_presser(date):
+        try:
+            stmt = (state["index"] or {}).get("conf_weighted")
+            pt = presser_tone(date, analyze=analyze)
+            if pt and stmt is not None:
+                gap = pt["conf_weighted"] - stmt
+                state["presser"] = {"tone": pt["conf_weighted"], "statement_tone": stmt,
+                                    "gap": gap, "n_sentences": pt["n_sentences"]}
+                state["log"].append(
+                    f"[news] 성명문 {stmt:+.3f} vs 기자회견 {pt['conf_weighted']:+.3f} (괴리 {gap:+.3f})")
+        except Exception as e:
+            state["log"].append(f"[news] presser 톤 생략: {str(e)[:35]}")
     return state
 
 
@@ -255,7 +271,8 @@ def reporting_node(state: State) -> State:
     path = write_report(conn, state["date"], REPORTS,
                         news=state.get("news") or None,
                         headline=state.get("headline") or None,
-                        pre_post=state.get("pre_post") or None)
+                        pre_post=state.get("pre_post") or None,
+                        presser=state.get("presser") or None)
     conn.close()
     state["report_path"] = str(path)
     append_daily_signal({"date": state["date"],
@@ -290,7 +307,7 @@ def build_graph():
 
 def _init_state(date: str) -> dict:
     return {"date": date, "statement_path": "", "n_sentences": 0, "index": {},
-            "news": {}, "pre_post": {}, "headline": {}, "market": {}, "signals": {},
+            "news": {}, "pre_post": {}, "presser": {}, "headline": {}, "market": {}, "signals": {},
             "report_path": "", "log": [], "errors": []}
 
 

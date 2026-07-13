@@ -46,9 +46,9 @@ def _signal_section(conn, date: str):
     return lines
 
 
-def _news_section(news, headline, pre_post=None):
-    """Phase 7 — News 축·통합(headline)·발표전후(2d) 카드. 값을 넘길 때만 렌더."""
-    if not news and not headline and not pre_post:
+def _news_section(news, headline, pre_post=None, presser=None):
+    """Phase 7 — News 축·통합·발표전후(2d)·성명문vs기자회견(#4) 카드. 값을 넘길 때만 렌더."""
+    if not news and not headline and not pre_post and not presser:
         return []
     lines = ["", "## 5. News 축 & 통합 (Phase 7)"]
     if news:
@@ -71,11 +71,16 @@ def _news_section(news, headline, pre_post=None):
         elif pre or post:
             side, w = ("발표 후", post) if post else ("발표 전", pre)
             lines.append(f"- 발표 전/후 뉴스: {side}만 수집됨 ({w['n_articles']}건) — 변화 계산 불가")
+    if presser:                                        # #4 Step 3: 성명문 vs 기자회견 톤 괴리
+        lines.append(
+            f"- **성명문 vs 기자회견 (#4): {presser['statement_tone']:+.3f} (성명문)"
+            f" → {presser['tone']:+.3f} (기자회견, {presser['n_sentences']}문장)"
+            f"  |  괴리 {presser['gap']:+.3f}**")
     return lines
 
 
 def write_report(conn, date: str, report_dir, news: dict = None,
-                 headline: dict = None, pre_post: dict = None) -> Path:
+                 headline: dict = None, pre_post: dict = None, presser: dict = None) -> Path:
     report_dir = Path(report_dir)
     report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -128,7 +133,7 @@ def write_report(conn, date: str, report_dir, news: dict = None,
         )
 
     lines += _signal_section(conn, date)
-    lines += _news_section(news, headline, pre_post)
+    lines += _news_section(news, headline, pre_post, presser)
 
     out = report_dir / f"report_{date}.md"
     out.write_text("\n".join(lines), encoding="utf-8")
