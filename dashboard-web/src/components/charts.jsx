@@ -51,6 +51,26 @@ export function SimpleLine({ data, x = "date", series, height = 240 }) {
   );
 }
 
+// 이중 축 오버레이 — 감성(왼쪽) vs 시장지표(오른쪽) 관계 표시용
+export function DualLine({ data, x = "month", left, right, height = 280 }) {
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={data} margin={{ top: 6, right: 0, left: -14, bottom: 0 }}>
+        <CartesianGrid stroke="#20242c" vertical={false} />
+        <XAxis dataKey={x} {...AXIS} minTickGap={50} />
+        <YAxis yAxisId="l" {...AXIS} />
+        <YAxis yAxisId="r" orientation="right" {...AXIS} />
+        <Tooltip {...TIP} />
+        <ReferenceLine yAxisId="l" y={0} stroke="#9aa2ad" strokeDasharray="4 4" opacity={0.5} />
+        <Line yAxisId="l" type="monotone" dataKey={left.key} name={left.name}
+          stroke={left.color} strokeWidth={2.2} dot={false} />
+        <Line yAxisId="r" type="monotone" dataKey={right.key} name={right.name}
+          stroke={right.color} strokeWidth={1.8} dot={false} opacity={0.85} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
 export function CompareBars({ data, x, y, colorBy, height = 230 }) {
   return (
     <ResponsiveContainer width="100%" height={height}>

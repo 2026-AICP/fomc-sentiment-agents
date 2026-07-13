@@ -135,7 +135,9 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB)
 
+    vs = ROOT / "analysis" / "validation_series.json"    # 감성↔시장 월별(-0.534 원본, 커밋본)
     files = {
+        "sentiment_vs_market.json": json.loads(vs.read_text(encoding="utf-8")) if vs.exists() else {},
         "meetings.json": export_meetings(con),
         "alerts.json": export_alerts(con),
         "news_daily.json": export_news_daily(),

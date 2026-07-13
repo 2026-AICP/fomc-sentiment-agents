@@ -1,9 +1,10 @@
 import { useJson, fmt } from "../lib/data";
 import { Kpi, Panel } from "../components/ui";
-import { IndexArea, SimpleLine } from "../components/charts";
+import { IndexArea, SimpleLine, DualLine } from "../components/charts";
 
 export default function Market() {
   const { data: market } = useJson("market");
+  const { data: vs } = useJson("sentiment_vs_market");
   if (!market) return <div className="loading">데이터 로딩…</div>;
   if (!market.length) return <div className="loading">시장 데이터 없음 — collect_market을 먼저 실행하세요.</div>;
 
@@ -27,7 +28,22 @@ export default function Market() {
           meta={inverted ? "역전 — 전통적 침체 선행 신호" : "정상"} />
       </div>
 
-      <h2 className="sec">VIX — 감성 검증의 기준 (통합↔VIX −0.534)</h2>
+      <h2 className="sec">감성 ↔ 시장 — 이 프로젝트의 핵심 관계 ★</h2>
+      {vs?.series ? (
+        <Panel cap={`주황 = 통합 감성지수(z, News+Fed, 왼쪽축) · 파랑 = VIX(오른쪽축). 감성이 내려가면 공포가 오르는 거울 관계 — 상관 ${vs.r} (${vs.n_months}개월, ${vs.period}). 3중 검증(홀드아웃·부트스트랩·LOMO)은 방법론·한계 참조.`}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <b>통합 감성지수 vs VIX (월별)</b>
+          <span className="pill" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)", fontSize: 13 }}>r = {vs.r}</span>
+        </div>
+        <DualLine data={vs.series}
+          left={{ key: "combined", name: "통합 감성지수 (z)", color: "var(--accent)" }}
+          right={{ key: "vix", name: "VIX", color: "var(--blue)" }} />
+        </Panel>
+      ) : (
+        <div className="note">감성↔시장 시리즈 없음 — analysis/build_validation_series.py 실행 후 export</div>
+      )}
+
+      <h2 className="sec">VIX — 감성 검증의 기준</h2>
       <Panel cap="시장 공포·스트레스 게이지. 정상성(평균회귀)이라 감성과의 레벨 상관에 적합 — 방법론·한계 참조">
         <IndexArea data={market} y="vix" color="var(--bad)" />
       </Panel>
