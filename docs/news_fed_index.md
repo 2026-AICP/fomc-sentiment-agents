@@ -39,6 +39,8 @@
 표준화(z)가 두 축의 분산차(Fed σ0.165 ≫ News σ0.065)를 맞춰 News가 묻히지 않게 함 → 재현치가 이전(-0.52)보다 소폭 강화.
 독립적 두 축을 합쳐 노이즈는 상쇄되고 공통 신호가 강화됨. "News & Fed" 두 축 설계가 정량으로 정당화.
 
+**그림**: `docs/figures/comparison/index_vs_vix_comparison.png` — 왼쪽 막대(Fed/News/통합 |상관| + 부트스트랩 CI), 오른쪽 산점도(통합 vs VIX, 감성↓→VIX↑). 재현: `analysis/comparison_figure.py`.
+
 ## 3b. 견고함 — 과최적·우연 아님 (홀드아웃 + 부트스트랩)
 
 통합 -0.534 가 (a) 과최적(in-sample)이 아니라 안 본 기간에도 일반화되고, (b) 우연이 아니라 0과 구분됨을 정량 검증. 코드: `analysis/validate_robustness.py`.
