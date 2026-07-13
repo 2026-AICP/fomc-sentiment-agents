@@ -101,22 +101,45 @@ def _write(path: Path, rows):
             w.writerow([f"{date}_presconf#{idx}", c, s, "", "", ""])
 
 
+# 팀 배정 — (이름, 파트). 같은 파트 2명이 독립 라벨(각자 파일). 파트1=1~75, 파트2=76~150.
+LABELERS = [("배재원", 1), ("최인영", 1), ("김형준", 2), ("지현민", 2)]
+RANGE = {1: "1-75", 2: "76-150"}
+
+
+def write_person_sheets(picks, labelers, outdir):
+    """개인별 라벨링 파일 — 각자 자기 파트만, 단일 label 칸. 파일명에 이름·범위."""
+    part1, part2 = split_parts(picks, 2)
+    master = part1 + part2                                  # 1~75=파트1, 76~150=파트2
+    rows = {1: list(enumerate(master[:75], 1)),
+            2: list(enumerate(master[75:], 76))}
+    made = []
+    for name, part in labelers:
+        path = outdir / f"label_{name} ({RANGE[part]}).csv"
+        with open(path, "w", newline="", encoding="utf-8-sig") as fp:
+            w = csv.writer(fp)
+            w.writerow(["row", "id", "chair", "sentence", "label", "notes"])
+            for rn, (c, date, idx, s) in rows[part]:
+                w.writerow([rn, f"{date}_presconf#{idx}", c, s, "", ""])
+        made.append(path.name)
+    return made
+
+
 def main():
-    n_total = int(sys.argv[1]) if len(sys.argv) > 1 else 150
-    n_parts = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+    mode = sys.argv[1] if len(sys.argv) > 1 else "people"
     outdir = DEFAULT_OUT.parent
-    picks = sample_sheet(n_total)
-    if n_parts <= 1:
-        _write(outdir / f"presser_labeling_sheet_{n_total}.csv", picks)
-        print(f"라벨링 시트 {len(picks)}문장 → presser_labeling_sheet_{n_total}.csv")
-        print("의장별:", dict(Counter(c for c, *_ in picks)))
-        return
-    for k, pt in enumerate(split_parts(picks, n_parts), 1):
-        _write(outdir / f"presser_labeling_part{k}_{len(pt)}.csv", pt)
-        print(f"파트 {k}: {len(pt)}문장 → presser_labeling_part{k}_{len(pt)}.csv "
-              f"| 의장별 {dict(Counter(c for c, *_ in pt))}")
-    print(f"→ {n_parts}조가 각 파트를 맡음. 조 안에서 2명이 label_A·label_B 독립 라벨.")
-    print("  파트끼리 문장 안 겹침(합치면 전체). 0(중립)/1(긍정)/2(부정).")
+    picks = sample_sheet(150)
+    if mode == "people":                                   # 개인별 파일(팀 배정)
+        for m in write_person_sheets(picks, LABELERS, outdir):
+            print("  " + m)
+        print("→ 각 파일 = 한 사람이 'label' 칸에 0(중립)/1(긍정)/2(부정) 기입.")
+        print("  같은 범위 2명(1-75: 배재원·최인영 / 76-150: 김형준·지현민) → kappa·합의.")
+    elif mode == "parts":                                  # 조별 공유 파일(label_A/B)
+        for k, pt in enumerate(split_parts(picks, 2), 1):
+            _write(outdir / f"presser_labeling_part{k}_{len(pt)}.csv", pt)
+            print(f"파트 {k}: {len(pt)}문장 | 의장별 {dict(Counter(c for c, *_ in pt))}")
+    else:                                                  # 단일 시트
+        _write(outdir / "presser_labeling_sheet_150.csv", picks)
+        print(f"단일 시트 150 | 의장별 {dict(Counter(c for c, *_ in picks))}")
 
 
 if __name__ == "__main__":
