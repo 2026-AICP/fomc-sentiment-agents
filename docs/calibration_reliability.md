@@ -6,7 +6,10 @@
 
 ## 1. 방법 (정직한 계산)
 
-- **라벨**: 사람 라벨 성명문 문장 150개(`labeling_ground_truth_150.csv`) 중 DB 텍스트 매칭 **143개**
+- **라벨**: 성명문 문장 150개 (`data/labeling/ground_truth_statement_150.csv`) 중 DB 텍스트 매칭 **143개**
+  - **4인 독립 라벨 + 합의**(2인 1조, 불일치는 토론 후 확정 — `analysis/merge_labels.py`)
+  - **inter-annotator Cohen's κ = 0.43 (1–75) · 0.65 (76–150)** — 3-class 감성 기준 보통~양호
+  - 독립 재라벨이 이전 정답지와 **150/150 일치** → 라벨 재현성 확인
 - **모델 통과 → raw logits → T=1·T=3.1 softmax 직접 산출** (양쪽 일관, 한 번의 추론)
 - 확신도 = max(prob), 정확도 = (argmax == 사람 라벨). ECE = 확신도 구간별 |정확도−확신도| 가중평균
 

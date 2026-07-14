@@ -23,8 +23,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 DB = ROOT / "data" / "fomc.db"
-LABELS = Path("/Users/jaewon/Desktop/'26 UNIST/활동/AICP/Agent"
-              "/outputs/data/labeling_ground_truth_150.csv")
+# 성명문 정답지 — 팀 4인 독립 라벨 + 합의(merge_labels.py, κ=0.43/0.65, 원본 100% 재현)
+LABELS = ROOT / "data" / "labeling" / "ground_truth_statement_150.csv"
 FIGDIR = ROOT / "docs" / "figures" / "calibration"     # 레포 내 (팀 공유·포스터용)
 T_RAW, T_CAL = 1.0, 3.1
 NBINS = 10
