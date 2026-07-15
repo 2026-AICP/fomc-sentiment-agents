@@ -31,18 +31,36 @@ NBINS = 10
 # label_code = softmax 인덱스와 동일: 0=neutral, 1=positive, 2=negative (engine.sentiment 매핑)
 
 
-def load_labeled():
-    """[(sentence, human_label_code), ...] — DB(fomc.db)에서 문장 텍스트 매칭."""
+def _presser_line(date, idx):
+    """presser 문장 텍스트 — data/pressers/FOMC_presconf_{date}.txt 의 idx 번째 줄."""
+    p = ROOT / "data" / "pressers" / f"FOMC_presconf_{date}.txt"
+    if not p.exists():
+        return None
+    lines = p.read_text(encoding="utf-8").splitlines()
+    return lines[idx] if 0 <= idx < len(lines) else None
+
+
+def load_labeled(labels_path=None):
+    """[(sentence, human_label_code), ...] — id 형식으로 소스 분기:
+       _statement#N → DB(fomc.db) · _presconf#N → data/pressers/*.txt."""
+    labels_path = labels_path or LABELS
     con = sqlite3.connect(DB)
     out = []
-    for r in csv.DictReader(open(LABELS, encoding="utf-8-sig")):
-        m = re.match(r"(\d{4}-\d{2}-\d{2})_statement#(\d+)", r["id"])
-        if not m:
+    for r in csv.DictReader(open(labels_path, encoding="utf-8-sig")):
+        code = (r.get("label_code") or "").strip()
+        if code not in ("0", "1", "2"):
             continue
-        row = con.execute("SELECT sentence FROM sentences WHERE date=? AND sentence_idx=? LIMIT 1",
-                          (m.group(1), int(m.group(2)))).fetchone()
-        if row:
-            out.append((row[0], int(r["label_code"])))
+        ms = re.match(r"(\d{4}-\d{2}-\d{2})_statement#(\d+)", r["id"])
+        mp = re.match(r"(\d{4}-\d{2}-\d{2})_presconf#(\d+)", r["id"])
+        sent = None
+        if ms:
+            row = con.execute("SELECT sentence FROM sentences WHERE date=? AND sentence_idx=? LIMIT 1",
+                              (ms.group(1), int(ms.group(2)))).fetchone()
+            sent = row[0] if row else None
+        elif mp:
+            sent = _presser_line(mp.group(1), int(mp.group(2)))
+        if sent:
+            out.append((sent, int(code)))
     con.close()
     return out
 
@@ -145,10 +163,14 @@ def make_figures(labels, p_raw, p_cal, tag="statement"):
     return e1, e3, f1, f2
 
 
+GT = {"statement": ROOT / "data" / "labeling" / "ground_truth_statement_150.csv",
+      "presser": ROOT / "data" / "labeling" / "ground_truth_presser_150.csv"}
+
+
 def main():
     tag = sys.argv[1] if len(sys.argv) > 1 else "statement"
-    data = load_labeled()
-    print(f"라벨 문장 {len(data)}개 로드 (DB 텍스트 매칭)")
+    data = load_labeled(GT.get(tag, LABELS))
+    print(f"[{tag}] 라벨 문장 {len(data)}개 로드")
     sents = [s for s, _ in data]
     labels = np.array([l for _, l in data])
     logits = model_logits(sents)
