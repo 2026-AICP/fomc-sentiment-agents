@@ -30,12 +30,24 @@ def lab(r):
     return (r.get("label") or "").strip()
 
 
+def kappa(a, b):
+    """Cohen's kappa (성명문 merge_labels.kappa 와 동일 식). 두 라벨러 리스트 → (원일치율, κ)."""
+    n, cats = len(a), ["0", "1", "2"]
+    po = sum(x == y for x, y in zip(a, b)) / n
+    ca, cb = Counter(a), Counter(b)
+    pe = sum((ca[c] / n) * (cb[c] / n) for c in cats)
+    return po, (po - pe) / (1 - pe) if pe < 1 else 1.0
+
+
 def main():
     final = []
     for rng, fa, fb, fd in PAIRS:
         ra = rd(LBL, fa)
         mb = {r["id"]: lab(r) for r in rd(LBL, fb)}
         resolve = {r["id"]: (r.get("final") or "").strip() for r in rd(DIS, fd)}
+        la = [lab(r) for r in ra]           # 라벨러 A·B 원라벨(κ용, repo 내 파일만 사용)
+        lb = [mb[r["id"]] for r in ra]
+        po, k = kappa(la, lb)
         agree = resolved = 0
         for r in ra:
             a, b = lab(r), mb[r["id"]]
@@ -47,7 +59,7 @@ def main():
                 resolved += 1
             final.append({"id": r["id"], "label_code": code,
                           "label": NAME.get(code, "?"), "source": src})
-        print(f"{rng}: agree {agree} / resolved {resolved}")
+        print(f"{rng}: 원일치 {po:.0%} · κ={k:.3f} · agree {agree} / resolved {resolved}")
 
     missing = [r["id"] for r in final if r["label_code"] not in NAME]
     if missing:
