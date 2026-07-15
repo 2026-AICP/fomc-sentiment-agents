@@ -107,19 +107,22 @@ RANGE = {1: "1-75", 2: "76-150"}
 
 
 def write_person_sheets(picks, labelers, outdir):
-    """개인별 라벨링 파일 — 각자 자기 파트만, 단일 label 칸. 파일명에 이름·범위."""
+    """개인별 라벨링 파일 — 성명문 팀 형식과 동일(컬럼 id,date,sentence,label · 빈 label 칸).
+
+    파일명 label_{이름}({범위}).csv (공백 없음, 성명문 팀 파일과 통일).
+    같은 범위 2명이 독립 라벨 → 나중에 merge_labels 로 kappa·합의.
+    """
     part1, part2 = split_parts(picks, 2)
     master = part1 + part2                                  # 1~75=파트1, 76~150=파트2
-    rows = {1: list(enumerate(master[:75], 1)),
-            2: list(enumerate(master[75:], 76))}
+    rows = {1: master[:75], 2: master[75:]}
     made = []
     for name, part in labelers:
-        path = outdir / f"label_{name} ({RANGE[part]}).csv"
+        path = outdir / f"label_{name}({RANGE[part]}).csv"
         with open(path, "w", newline="", encoding="utf-8-sig") as fp:
             w = csv.writer(fp)
-            w.writerow(["row", "id", "chair", "sentence", "label", "notes"])
-            for rn, (c, date, idx, s) in rows[part]:
-                w.writerow([rn, f"{date}_presconf#{idx}", c, s, "", ""])
+            w.writerow(["id", "date", "sentence", "label"])   # 성명문 팀 파일과 동일 컬럼
+            for c, date, idx, s in rows[part]:
+                w.writerow([f"{date}_presconf#{idx}", date, s, ""])
         made.append(path.name)
     return made
 
