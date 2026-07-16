@@ -123,9 +123,16 @@ def export_meta(con, counts):
             "p_sign_test": 1.7e-13,
             "note": "기자회견 톤이 성명문보다 일관되게 신중 (2011~2026, 4의장)",
         },
-        "calibration": {                      # analysis/reliability_diagram
-            "temperature": 3.1, "ece_raw": 0.294, "ece_calibrated": 0.112,
+        "calibration": {                      # analysis/reliability_diagram (사람 라벨 300문장)
+            "temperature": 3.1, "labeled_sentences": 300,
+            "ece_raw": 0.294, "ece_calibrated": 0.112,          # 하위호환(성명문 flat 키 유지)
             "entropy_raw": 0.24, "entropy_calibrated": 0.79,
+            "statement": {"ece_raw": 0.294, "ece_calibrated": 0.112,
+                          "entropy_raw": 0.24, "entropy_calibrated": 0.79,
+                          "accuracy": 0.636, "kappa": [0.43, 0.65]},
+            "presser": {"ece_raw": 0.130, "ece_calibrated": 0.116,
+                        "entropy_raw": 0.24, "entropy_calibrated": 0.81,
+                        "accuracy": 0.780, "kappa": [0.24, 0.54]},
         },
     }
 

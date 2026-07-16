@@ -37,8 +37,9 @@ export default function Method() {
           <div className="cap">2009-03(금융위기)을 빼도 −0.543 — 2008·2020이 결과를 만들지 않음</div>
         </Panel>
         <Panel title="온도 보정 T=3.1 (확신도가 정직)">
-          ECE <b className="num">{c.ece_raw} → {c.ece_calibrated}</b> · 엔트로피 <b className="num">{c.entropy_raw} → {c.entropy_calibrated}</b>
-          <div className="cap">사람 라벨 검증 — 과신 교정 후에야 확신도 가중 지수가 정직함</div>
+          성명문 ECE <b className="num">{(c.statement ?? c).ece_raw} → {(c.statement ?? c).ece_calibrated}</b>
+          {c.presser && <> · presser ECE <b className="num">{c.presser.ece_raw} → {c.presser.ece_calibrated}</b></>}
+          <div className="cap">사람 라벨 {c.labeled_sentences ?? 143}문장(성명문150+presser150) 검증 — 한 온도값이 문어·구어 모두에서 정직(엔트로피 0.24→~0.8)</div>
         </Panel>
       </div>
 
