@@ -7,7 +7,7 @@
 
 정직한 계산: 라벨 문장을 모델에 통과 → **raw logits** → T=1·T=3.1 softmax 직접 산출(양쪽 일관).
 성명문·presser 각 150개 라벨로 **각각 산출** — id 형식으로 소스 분기(_statement→DB / _presconf→data/pressers/*.txt).
-성명문 ECE 0.294→0.112(과신 교정) · presser ECE 0.124→0.123(구어체는 raw부터 정직, T=3.1이 유지). 상세: docs/calibration_reliability.md.
+성명문 ECE 0.294→0.112(과신 교정) · presser ECE 0.130→0.116(구어체는 raw부터 정직, T=3.1이 유지·소폭 개선). 상세: docs/calibration_reliability.md.
 
 실행: python3 analysis/reliability_diagram.py [statement|presser]   # 기본 statement
 산출: reliability_diagram_{tag}.png, entropy_distribution_{tag}.png (FIGDIR)
