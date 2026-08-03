@@ -86,7 +86,7 @@ python3 -m pytest
 |---|---|---|
 | `SENTIMENT_ENGINE` | `dummy` | `finbert` 면 진짜 엔진 |
 | `FINBERT_MODEL_DIR` | `models/finbert-finetuned` | 모델 경로 |
-| `FINBERT_TEMPERATURE` | `3.1` | 온도 보정(캘리브레이션). `1.0` 이면 베이스라인 |
+| `FINBERT_TEMPERATURE` | `1.0` | 온도. 기본=원본 FinBERT. (지도교수 피드백으로 자체 라벨 보정 제외) |
 | `NEWS_API_KEY` | (`.newsapi_key` 파일) | Marketaux 키. 코드·git 에 넣지 말 것(각자 발급) |
 | `NEWS_WINDOW_BEFORE`/`AFTER` | `3`/`1` | 발표일 전후 뉴스 창(일) |
 
