@@ -23,7 +23,7 @@ export default function Presser() {
       </div>
 
       <h2 className="sec">회의별 톤 — 성명문 vs 기자회견</h2>
-      <Panel cap="주황 = 성명문, 파랑 = 기자회견(의장 발언만, FinBERT T=3.1 동일 방법). 기자회견이 거의 항상 아래.">
+      <Panel cap="주황 = 성명문, 파랑 = 기자회견(의장 발언만, FinBERT 동일 방법). 기자회견이 거의 항상 아래.">
         <SimpleLine data={presser} height={280}
           series={[
             { key: "statement", name: "성명문", color: "var(--accent)" },

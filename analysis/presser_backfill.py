@@ -1,6 +1,6 @@
 """presser 히스토리 백필 분석 — "기자회견 톤이 성명문보다 신중한가?"
 
-data/pressers/*.txt 전부를 배치 FinBERT(T=3.1)로 점수화 → presser 톤(conf_weighted).
+data/pressers/*.txt 전부를 배치 FinBERT로 점수화 → presser 톤(conf_weighted).
 fomc.db 의 성명문 톤과 짝지어 괴리(presser − 성명문)를 여러 회의로 검정한다:
   · 부호검정(sign test): 'presser < 성명문' 회의 비율이 우연(50%)과 다른가
   · 평균 괴리 + Wilcoxon 부호순위 검정
@@ -67,7 +67,7 @@ def main():
         return r[0] if r else None
 
     files = sorted(PRESSER_DIR.glob("FOMC_presconf_*.txt"))
-    print(f"presser {len(files)}건 배치 점수화 (FinBERT T=3.1)...")
+    print(f"presser {len(files)}건 배치 점수화 (FinBERT)...")
     tok, model, torch, T = _load()
     rows = []
     for f in files:

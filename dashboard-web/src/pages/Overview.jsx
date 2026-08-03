@@ -33,7 +33,7 @@ export default function Overview() {
       </div>
 
       <h2 className="sec">회의 톤 타임라인 (Fed 축, 2000~)</h2>
-      <Panel cap="확신도 가중(conf_weighted) · FinBERT T=3.1 보정 · 220개 회의">
+      <Panel cap="확신도 가중(conf_weighted) · FinBERT(원본) · 220개 회의">
         <IndexArea data={meetings} y="tone" />
       </Panel>
 

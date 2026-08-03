@@ -5,7 +5,7 @@ analysis/news_index.py(과거 WSJ·월별, 검증용)와 **방법론을 공유**
   · 집계: '일별'(운영용 — 매일 갱신)
   · 텍스트: description 우선(짧으면 title). ← 3방식 비교에서 확신도 최고(가장 깨끗).
     title 혼합/단독은 확신도를 떨어뜨려 폐기(헤드라인이 극단·오해 유발).
-스코어러(FinBERT 배치·온도보정 T=3.1)는 검증된 news_index.score_articles 재사용.
+스코어러(FinBERT 배치)는 검증된 news_index.score_articles 재사용.
 
 ★신뢰 표시(부트스트랩 신뢰구간):
   '오늘 값을 얼마나 믿나'는 per-article 확신도가 아니라, 그날 기사 수(N)로 만든

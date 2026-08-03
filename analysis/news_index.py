@@ -2,7 +2,7 @@
 
 WSJ Fed·통화정책 관련 기사(연도별 CSV)를 FinBERT로 감성분석하여
 월별 News Sentiment Index를 산출한다. Fed 인덱스와 동일한 방법론
-(확신도 가중 + 온도 보정)을 쓴다.
+(확신도 가중)을 쓴다.
 
 데이터: WSJ 연도별 CSV (P_WSJ_YYYY.csv). 용량 때문에 git 에 없음 →
   드롭박스에서 받아 아래 경로에 둔다 (기본 data/wsj/, 또는 WSJ_DIR 로 지정).
@@ -60,7 +60,7 @@ def load_articles(wsj_dir: Path):
 
 
 def score_articles(df):
-    """기사별 감성 확률·score·entropy 계산 (배치 추론, 온도 보정)."""
+    """기사별 감성 확률·score·entropy 계산 (배치 추론)."""
     import pandas as pd
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer

@@ -95,7 +95,7 @@ class PipelineState(TypedDict):
 **② Sentiment Analyst**
 - 입력: statement_path. 출력: index
 - 도구: `sentiment.analyze()`(문장별), `aggregate.aggregate_meeting()`
-- 보정 엔진(finbert-cal, T=3.1) 사용 → 인덱스 정직성.
+- 원본 FinBERT(T=1) 사용 — 자체 라벨 기반 보정은 지도교수 피드백으로 제외.
 
 **③ Market Comparison**
 - 입력: date. 출력: market

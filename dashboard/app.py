@@ -421,7 +421,7 @@ def _highlight_html(sents):
 
 def page_fed(db, mt):
     st.markdown("## Fed 축 (성명문)")
-    st.caption("회의별 감성 톤 타임라인 + 문장별 분해 (FinBERT 온도보정 T=3.1)")
+    st.caption("회의별 감성 톤 타임라인 + 문장별 분해 (FinBERT 원본)")
     cw = mt[mt.method == "conf_weighted"].copy()
     if not len(cw):
         st.info("회의 톤 없음")

@@ -1,6 +1,6 @@
 """기자회견(presser) 톤 산출 — data/pressers/*.txt 의 의장 발언을 성명문과 동일 방식으로 점수화.
 
-문장별 FinBERT(T=3.1) → 확신도가중(conf_weighted, index/aggregate 공식과 동일).
+문장별 FinBERT → 확신도가중(conf_weighted, index/aggregate 공식과 동일).
 성명문과 apples-to-apples 라서 '성명문 vs presser' 비교(Step 3)의 재료가 된다.
 
   presser_tone(date) → {conf_weighted, confidence, n_sentences} 또는 None(파일 없음)
@@ -27,7 +27,7 @@ def has_presser(date: str) -> bool:
 def presser_tone(date: str, analyze=None):
     """presser 의장 발언 → {conf_weighted, confidence, n_sentences} 또는 None.
 
-    analyze: 문장→{score, entropy, ...} 스코어러. 기본은 engine.sentiment(FinBERT T=3.1)로
+    analyze: 문장→{score, entropy, ...} 스코어러. 기본은 engine.sentiment(FinBERT)로
     성명문과 동일(비교 공정). 테스트는 가짜 스코어러를 주입해 모델 없이 검증.
     """
     p = presser_path(date)

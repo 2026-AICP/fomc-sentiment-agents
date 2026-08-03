@@ -10,24 +10,23 @@ News & Fed Sentiment Index를 산출하고, S&P500·VIX 등 시장 지표와 비
 
 ## 현재 상태
 - **Phase 0~2** ✅ 스캐폴딩 + 더미 엔진 end-to-end
-- **Phase 3** ✅ FinBERT 엔진 통합·검증·캘리브레이션 (`docs/phase3_evaluation.md`)
-- **Phase 4** ✅ 인덱스 집계 방식 비교 + 보정 효과 (`docs/phase4_index.md`)
+- **Phase 3** ✅ FinBERT 엔진 통합 (작년 파인튜닝 모델, 원본 T=1)
+- **Phase 4** ✅ 인덱스 집계 방식 비교 (`docs/phase4_index.md`)
 - **Phase 5** ✅ 시장 비교(S&P500·VIX) + 톤-반응 정합성 (`docs/phase5_comparison.md`)
 - **Phase 6** ✅ 신호 규칙셋(A·B·C) + 백테스트 + 자동보고서 (`docs/phase6_signals.md`)
 - **Phase 7** ✅ 멀티에이전트(LangGraph) — Collector→Fed·News분석→통합(headline)→Market→신호→보고서, 무인 batch 9/9 검증 (`docs/phase7_design.md`)
   - News 축: Marketaux 실시간 뉴스 스크래퍼 + 일별 News 지수(95% CI) + Fed와 통합(headline)
 - **Phase 8** ✅ 스케줄러 · 로깅 · 파이프라인 성공률 (`docs/phase8_ops.md`)
 
-설계 문서는 `docs/` 참조: `phase7_design.md`(멀티에이전트), `phase8_ops.md`(운영), `news_fed_index.md`(News+Fed 통합), `signal_design.md`(신호 설계), `phase6_signals.md`, `phase3_evaluation.md`, `phase4_index.md`, `phase5_comparison.md`, `gpu_server.md`(GPU 서버).
+설계 문서는 `docs/` 참조: `phase7_design.md`(멀티에이전트), `phase8_ops.md`(운영), `news_fed_index.md`(News+Fed 통합), `signal_design.md`(신호 설계), `phase6_signals.md`, `phase4_index.md`, `phase5_comparison.md`, `gpu_server.md`(GPU 서버).
 
 ## 구조
 ```
 engine/    수집·전처리·감성엔진
-  ├ sentiment.py      진짜 FinBERT 엔진 (확률·엔트로피·온도보정)
+  ├ sentiment.py      진짜 FinBERT 엔진 (확률·엔트로피)
   ├ dummy_sentiment.py 더미 엔진 (테스트용)
   ├ scrape.py         FOMC 성명문 스크래퍼
-  ├ news_scrape.py    Fed 뉴스 스크래퍼 (Marketaux)
-  └ evaluate.py       감성 엔진 평가 (F1·ECE·혼동·엔트로피)
+  └ news_scrape.py    Fed 뉴스 스크래퍼 (Marketaux, F∧M 키워드)
 index/     인덱스 집계 (label_avg / conf_weighted 두 방식)
 analysis/  시장 비교·신호·News 지수 (Phase 5·6·7)
   ├ collect_market.py, analyze_alignment.py  시장 수집·톤반응 정합
