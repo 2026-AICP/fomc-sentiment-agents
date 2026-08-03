@@ -20,10 +20,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict
 
-# 온도 보정(temperature scaling): human label 150문장으로 캘리브레이션.
-#   T=1.0 → 원본(과신, ECE 0.257). T=3.1 → 보정(ECE 0.07~0.10, 2-fold CV).
-#   확신도 가중 인덱스가 정직하려면 보정 필요. T=1 로 두면 베이스라인 복원.
-TEMPERATURE = float(os.getenv("FINBERT_TEMPERATURE", "3.1"))
+# 온도(temperature scaling): 기본 T=1.0 = 원본 FinBERT(작년 파인튜닝 그대로).
+#   지도교수 피드백(2026-07): 자체 라벨 기반 보정(T=3.1)은 제외 — 모델에 이미
+#   내장된 기존 라벨을 신뢰하고 baseline 사용. 필요시 FINBERT_TEMPERATURE 로 조정.
+TEMPERATURE = float(os.getenv("FINBERT_TEMPERATURE", "1.0"))
 MODEL_TAG = "finbert-cal" if abs(TEMPERATURE - 1.0) > 1e-6 else "finbert-finetuned"
 
 # 모델 디렉토리: 환경변수 우선, 없으면 저장소 루트의 models/finbert-finetuned/

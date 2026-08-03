@@ -26,28 +26,33 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENDPOINT = "https://api.marketaux.com/v1/news/all"
-# Fed·통화정책·거시 키워드 (Marketaux 검색문법: | = OR, "구절" = 정확구절).
-# 2a 확장: FOMC 파생어(정책·금리행동·연준인사·기조) 6→15개. 넓힌 만큼 is_relevant 로 정제.
-QUERY = ('"Federal Reserve" | "Federal Open Market Committee" | FOMC | "monetary policy" '
-         '| "interest rates" | "rate cut" | "rate hike" | "rate decision" | "basis points" '
-         '| Powell | hawkish | dovish | "dot plot" | "central bank" | inflation')
+# Marketaux 검색문법: | = OR, "구절" = 정확구절. 여기선 F·핵심 M 앵커로 넓게 후보 수집 →
+# 정밀 규칙(F그룹 AND M그룹)은 아래 is_relevant 가 최종 적용 (지도교수 세트, 2026-07).
+QUERY = ('"federal reserve" | fed | Powell | Warsh | Yellen | "monetary policy" '
+         '| "central bank" | "fed funds rate" | "interest rates" | "quantitative easing"')
 PER_PAGE = 3            # 무료 티어 상한(요청당 3건). 유료면 상향 가능.
 OUT = ROOT / "data" / "news" / "fed_news.csv"
 
-# 관련성 필터(2a): 넓힌 쿼리로 들어온 기사 중, 점수화 대상(제목+설명)이 실제로
-# Fed·통화정책·핵심거시 주제인 것만 남긴다(Marketaux가 본문만 매칭한 곁가지 제거).
-# 짧아 오인 위험 있는 fed·cpi·pce 는 단어경계(\b), 나머지는 부분일치(복수형·파생 포함).
-_RELEVANCE_RE = re.compile(
-    r"\bfed\b|federal reserve|fomc|federal open market|monetary polic|"
-    r"interest rate|rate cut|rate hike|rate decision|basis point|"
-    r"central bank|hawkish|dovish|dot plot|powell|inflation|\bcpi\b|\bpce\b",
+# ── 뉴스 선정 = 지도교수 키워드 세트(2026-07): F그룹 AND M그룹 (각 1개 이상 언급) ──
+# data/wsj/(2000~2021) 수집 때 쓴 search_term 과 동일 세트 → 과거·라이브 일관.
+# F: 연준 자체 — "federal reserve" 또는 fed(=the Fed 포함). 단어경계로 오인 축소.
+_F_RE = re.compile(r"\bfederal reserve\b|\bfed\b", re.IGNORECASE)
+# M(27): 정책·도구 + 의장 성 + 국내외 중앙은행/직위. Volcker 는 교수 표기(Volker)도 함께 매치.
+_M_RE = re.compile(
+    r"money supply|open market operation|quantitative easing|monetary polic|"
+    r"fed funds rate|overnight lending rate|interest rate|"
+    r"lender of last resort|discount window|central bank|fed chair(?:man)?|"
+    r"bernanke|vol[ck]er|greenspan|yellen|powell|\bwarsh\b|"
+    r"european central bank|\becb\b|bank of england|bank of japan|\bboj\b|"
+    r"bank of china|bundesbank|bank of france|bank of italy",
     re.IGNORECASE,
 )
 
 
 def is_relevant(title, description=""):
-    """제목+설명에 Fed·통화정책·핵심거시 앵커가 하나라도 있으면 True (2a 곁가지 제거)."""
-    return bool(_RELEVANCE_RE.search(f"{title or ''} {description or ''}"))
+    """지도교수 규칙(2026-07): 제목+설명에 F그룹 최소1 AND M그룹 최소1 이면 True."""
+    text = f"{title or ''} {description or ''}"
+    return bool(_F_RE.search(text) and _M_RE.search(text))
 
 
 def _api_key():
