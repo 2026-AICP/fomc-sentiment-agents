@@ -59,7 +59,7 @@ def analyze(sentence: str) -> Dict[str, float]:
     inputs = tok(sentence, return_tensors="pt", truncation=True, max_length=256).to(device)
     with torch.no_grad():
         logits = model(**inputs).logits
-    probs = torch.softmax(logits / TEMPERATURE, dim=-1)[0].tolist()  # 온도 보정
+    probs = torch.softmax(logits / TEMPERATURE, dim=-1)[0].tolist()  # 온도 적용 (기본 T=1 = 원본)
 
     p_neu, p_pos, p_neg = probs[_NEU], probs[_POS], probs[_NEG]
     score = p_pos - p_neg
