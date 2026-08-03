@@ -4,7 +4,7 @@ import { Kpi, Panel } from "../components/ui";
 export default function Method() {
   const { data: meta } = useJson("meta");
   if (!meta) return <div className="loading">데이터 로딩…</div>;
-  const v = meta.validation, c = meta.calibration;
+  const v = meta.validation;
 
   return (
     <>
@@ -35,10 +35,6 @@ export default function Method() {
         <Panel title="LOMO (단일사건 아님)">
           256개월을 하나씩 빼도 전부 <b className="num">[{v.lomo_range[0]}, {v.lomo_range[1]}]</b>
           <div className="cap">2009-03(금융위기)을 빼도 −0.543 — 2008·2020이 결과를 만들지 않음</div>
-        </Panel>
-        <Panel title="온도 보정 T=3.1 (확신도가 정직)">
-          ECE <b className="num">{c.ece_raw} → {c.ece_calibrated}</b> · 엔트로피 <b className="num">{c.entropy_raw} → {c.entropy_calibrated}</b>
-          <div className="cap">사람 라벨 검증 — 과신 교정 후에야 확신도 가중 지수가 정직함</div>
         </Panel>
       </div>
 
