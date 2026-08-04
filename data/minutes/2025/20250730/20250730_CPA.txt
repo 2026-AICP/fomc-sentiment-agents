@@ -8,6 +8,8 @@ At the conclusion of the discussion, the Committee voted to direct the Federal R
 
 "Effective July 31, 2025, the Federal Open Market Committee directs the Desk to:
 
+Undertake open market operations as necessary to maintain the federal funds rate in a target range of 4-1/4 to 4-1/2 percent. Conduct standing overnight repurchase agreement operations with a minimum bid rate of 4.5 percent and with an aggregate operation limit of $500 billion. Conduct standing overnight reverse repurchase agreement operations at an offering rate of 4.25 percent and with a per-counterparty limit of $160 billion per day. Roll over at auction the amount of principal payments from the Federal Reserve's holdings of Treasury securities maturing in each calendar month that exceeds a cap of $5 billion per month. Redeem Treasury coupon securities up to this monthly cap and Treasury bills to the extent that coupon principal payments are less than the monthly cap. Reinvest the amount of principal payments from the Federal Reserve's holdings of agency debt and agency mortgage-backed securities (MBS) received in each calendar month that exceeds a cap of $35 billion per month into Treasury securities to roughly match the maturity composition of Treasury securities outstanding. Allow modest deviations from stated amounts for reinvestments, if needed for operational reasons."
+
 The vote also encompassed approval of the statement below for release at 2:00 p.m.:
 
 "Although swings in net exports continue to affect the data, recent indicators suggest that growth of economic activity moderated in the first half of the year. The unemployment rate remains low, and labor market conditions remain solid. Inflation remains somewhat elevated.

@@ -42,6 +42,8 @@ STANDARD = ("DFMOMO", "SRES", "SRFS", "SEO", "PVCCEO", "CPA")
 # 행정·절차 섹션 — 경제 감성이 아니라 조직 안건(임원 선출·규정 승인)이라 제외(팀 수집본과 동일).
 # 투표 명단(Voting for/against)·전자투표(notation vote)도 같은 이유로 _END_PARA 에서 잘라낸다.
 SKIP_CODES = {"AOM"}                 # Annual Organizational Matters
+# 본문을 담는 블록 요소 — 문단 외에 정책지시문(blockquote)·목록(ul/ol)도 본문이다.
+_BLOCKS = ("p", "blockquote", "ul", "ol")
 # 약어 생성 시 건너뛰는 관사·전치사·접속사 (팀 코드 재현: SRES=Staff Review of the Economic Situation)
 _STOP = {"of", "the", "in", "and", "on", "for", "to", "a", "an", "at", "by", "with"}
 # 소제목 아닌 <strong>: 날짜 머리말("January 28-29, 2025"), 투표 라벨("Voting for this action:")
@@ -64,6 +66,27 @@ def _acronym(title: str) -> str:
     return "".join(w[0].upper() for w in words if w.lower() not in _STOP)
 
 
+# 표준 6섹션은 시대별로 소제목 문구가 달라(예: 2021 "…Current **Economic** Conditions…",
+# 2022 "Financial Developments…") 글자 그대로 약어를 만들면 코드가 갈린다(PVCECEO/FDOMO).
+# 섹션별 시계열이 끊기지 않도록 **역할 기준으로 표준 코드에 정규화**한다(팀도 PVCCEO 로 통일).
+_CANON = [
+    (re.compile(r"participants'?\s+views", re.I), "PVCCEO"),
+    (re.compile(r"staff\s+review.*economic", re.I), "SRES"),
+    (re.compile(r"staff\s+review.*financial", re.I), "SRFS"),
+    (re.compile(r"staff\s+economic\s+outlook", re.I), "SEO"),
+    (re.compile(r"committee\s+policy\s+action", re.I), "CPA"),
+    (re.compile(r"open\s+market\s+operations|financial\s+markets", re.I), "DFMOMO"),
+]
+
+
+def section_code(title: str) -> str:
+    """소제목 → 코드. 표준 6섹션은 문구가 달라도 같은 코드로, 그 외는 약어 자동 생성."""
+    for pat, code in _CANON:
+        if pat.search(title):
+            return code
+    return _acronym(title)
+
+
 def _is_heading(text: str) -> bool:
     """섹션 소제목인지 — 길이·콜론·날짜머리말·투표라벨·구분선을 배제."""
     t = text.strip()
@@ -82,14 +105,18 @@ def parse_sections(html: str):
     for fn in article.find_all("div", class_="footnotes"):     # 각주 블록 제외
         fn.decompose()
     out, cur = [], None
-    for p in article.find_all("p"):
-        strong = p.find("strong")
+    # 본문은 <p> 외에 정책지시문(blockquote)·항목목록(ul/ol)에도 있다 → 함께 수집.
+    # 중첩(blockquote 안의 p)은 바깥 요소에서 이미 처리되므로 건너뛴다.
+    for p in article.find_all(_BLOCKS):
+        if p.find_parent(_BLOCKS):
+            continue
+        strong = p.find("strong") if p.name == "p" else None
         head = strong.get_text(" ", strip=True) if strong else ""
         # 소제목 문단: <strong> 으로 시작하는 문단 (각주번호는 제거)
         if strong and p.get_text(strip=True).startswith(head):
             title = re.sub(r"\s*\d+$", "", head)
             if _is_heading(title):
-                cur = {"code": _acronym(title), "title": title, "paras": []}
+                cur = {"code": section_code(title), "title": title, "paras": []}
                 out.append(cur)
                 # 제목 뒤에 같은 문단에 본문이 이어지면 그것도 담는다
                 rest = p.get_text(" ", strip=True)[len(head):].strip()

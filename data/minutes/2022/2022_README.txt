@@ -8,7 +8,6 @@ CPA: Committee Policy Action
 #Asterisks(*) used to indicate contents existing in addition to the six repetitive ones.
 
 20220126
-*FDOMO: Financial Developments and Open Market Operations
 *PRSBS: Principles for Reducing the Size of the Balance Sheet
 
 20220316
