@@ -18,6 +18,14 @@
 파일 형식: **문단당 1줄, 문단 사이 빈 줄**, 소제목은 본문에 포함하지 않음 (팀 파일과 동일).
 회의록은 회의 **3주 후** 공개 → 최근 회의는 미게시(404)일 수 있고, 그때는 조용히 건너뛴다.
 
+★시대별 편차 (분석 시 유의):
+  · 2008 이전: 소제목 구조 자체가 없어 자동 분할 불가 → `import_team_minutes.py` 로 팀 정리본 이관.
+  · 2009 전후: 연준이 섹션을 **합쳐서** 표기한 시기가 있다.
+      "Staff Review of the Economic **and Financial** Situation"        → SRES 하나로 저장(SRFS 없음)
+      "Meeting Participants' Views **and Committee Policy Action**"     → PVCCEO 하나로 저장(CPA 없음)
+    내용이 빠진 게 아니라 한 파일에 함께 들어있다. 실제 소제목은 `_titles.tsv` 에 원문 그대로 남긴다.
+  · 긴급(intermeeting) 회의는 회의록이 짧아 일부 섹션만 존재한다(예: 2001-04-18).
+
 실행:
   python3 engine/minutes_scrape.py            # 최근 120일 회의만 (매일 자동화용 기본값)
   python3 engine/minutes_scrape.py all        # 전 회의 백필 (요청 많음 — 수동 1회용)

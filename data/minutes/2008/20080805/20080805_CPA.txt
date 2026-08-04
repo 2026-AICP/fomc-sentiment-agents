@@ -1,0 +1,52 @@
+In the Committee's discussion of monetary policy for the intermeeting period, members agreed that labor markets had softened further, that financial markets remained under considerable stress, and that these factors--in conjunction with still-elevated energy prices and the ongoing housing contraction--would likely weigh on economic growth in coming quarters. In addition, members saw continuing downside risks to this outlook, particularly reflecting possible further deterioration in financial conditions. Members generally anticipated that inflation would moderate; however, they emphasized the risks to the inflation outlook posed by persistent high readings on headline inflation and a possible unmooring of inflation expectations. Against this backdrop, nearly all members judged that leaving the federal funds rate unchanged at this meeting was appropriate and would most effectively promote progress toward the Committee's dual objectives of maximum employment and price stability. Most members did not see the current stance of policy as particularly accommodative, given that many households and businesses were facing elevated borrowing costs and reduced credit availability due to the effects of financial market strains as well as macroeconomic risks. Although members generally anticipated that the next policy move would likely be a tightening, the timing and extent of any change in policy stance would depend on evolving economic and financial developments and the implications for the outlook for economic growth and inflation.
+
+At the conclusion of the discussion, the Committee voted to authorize and direct the Federal Reserve Bank of New York, until it was instructed otherwise, to execute transactions in the System Account in accordance with the following domestic policy directive:
+
+"The Federal Open Market Committee seeks monetary and financial conditions that will foster price stability and promote sustainable growth in output. To further its long-run objectives, the Committee in the immediate future seeks conditions in reserve markets consistent with maintaining the federal funds rate at an average of around 2 percent."
+
+The vote encompassed approval of the statement below to be released at 2:15 p.m.:
+
+"The Federal Open Market Committee decided today to keep its target for the federal funds rate at 2 percent.
+
+Economic activity expanded in the second quarter, partly reflecting growth in consumer spending and exports. However, labor markets have softened further and financial markets remain under considerable stress. Tight credit conditions, the ongoing housing contraction, and elevated energy prices are likely to weigh on economic growth over the next few quarters. Over time, the substantial easing of monetary policy, combined with ongoing measures to foster market liquidity, should help to promote moderate economic growth.
+
+Inflation has been high, spurred by the earlier increases in the prices of energy and some other commodities, and some indicators of inflation expectations have been elevated. The Committee expects inflation to moderate later this year and next year, but the inflation outlook remains highly uncertain.
+
+Although downside risks to growth remain, the upside risks to inflation are also of significant concern to the Committee. The Committee will continue to monitor economic and financial developments and will act as needed to promote sustainable economic growth and price stability."
+
+Votes for this action: Messrs. Bernanke and Geithner, Ms. Duke, Messrs. Kohn, Kroszner, and Mishkin, Ms. Pianalto, Messrs. Plosser, Stern, and Warsh.
+
+Votes against this action: Mr. Fisher.
+
+Mr. Fisher dissented because he favored an increase in the target federal funds rate to help restrain inflation and inflation expectations, which were at risk of drifting higher. While the financial system remained fragile and economic growth was sluggish and could weaken further, he saw a greater risk to the economy from upward pressures on inflation. In his view, businesses had become more inclined to raise prices to pass on the higher costs of imported goods and higher energy costs, the latter of which were well above their levels of late 2007. Accordingly, he supported a policy tightening at this meeting.
+
+It was agreed that the next meeting of the Committee would be held on Tuesday, September 16, 2008.
+
+The meeting adjourned at 1:50 p.m.
+
+Conference Call
+On July 24, 2008, the Federal Open Market Committee met in a joint session with the Board of Governors to consider several proposals to extend or enhance Federal Reserve System liquidity facilities. In light of continued significant stresses in financial markets and the experience to date with the Term Auction Facility (TAF), the Term Securities Lending Facility (TSLF), and the Primary Dealer Lending Facility (PDCF), the staff proposed modifications to these programs. The modifications included auctioning options on up to an additional $50 billion of TSLF loans and lengthening the term to maturity of all loans made under the TAF to 84 days. Contingent upon Board approval of the change to TAF loans, the Committee was asked to consider an expansion of the existing currency swap arrangement with the European Central Bank to facilitate a similar change in the term of dollar credits auctioned by the ECB. Finally, policymakers were asked to vote on extending the availability of the TSLF and PDCF past the year-end, a topic that had been discussed on a preliminary basis at the joint Board/FOMC meeting on June 25, 2008.
+
+In the discussion, meeting participants exchanged views on issues entailed in administering the TAF and term primary discount window credit. Issues regarding credit risk and collateral requirements received particular attention.
+
+Some participants raised questions about the net benefit of approving and announcing the proposed changes at this time, asking, for example, whether such an announcement could suggest that the Federal Reserve saw financial markets as more fragile than expected or whether adjustments to the liquidity facilities could cause market analysts to infer that the System intended to keep the facilities in place permanently. Most participants expressed general support for the proposals as improving the System's tools for supporting market liquidity. However, there was considerable sentiment for altering the TAF proposal to allow for both 28- and 84-day credits, and the Chairman directed the staff to confer, to consult further with policymakers, and to revise the proposal accordingly for notation votes in the near future by the Board and the FOMC.
+
+At this meeting, the Committee unanimously approved the following resolution:
+
+TSLF Extension Authorization
+The FOMC extends until January 30, 2009, its authorizations for the Federal Reserve Bank of New York to engage in transactions with primary dealers through the Term Securities Lending Facility, subject to the same collateral, interest rate and other conditions previously established by the Committee.
+
+With Mr. Plosser dissenting, the Committee voted to approve the resolution below. Mr. Plosser dissented because he viewed the net benefit of the TSLF options as being insufficient to justify adding them to the support already being provided to market liquidity.
+
+TSLF Options Authorization
+In addition to the current authorizations granted to the Federal Reserve Bank of New York to engage in term securities lending transactions, the Federal Open Market Committee authorizes the Federal Reserve Bank of New York to offer options on up to $50 billion in additional draws on the Facility, subject to the other terms and conditions previously established for the Facility.
+
+Mr. Lockhart voted as alternate member at this meeting.
+
+Notation Votes
+By notation vote completed on July 14, 2008, the Committee unanimously approved the minutes of the FOMC meeting held on June 24-25, 2008.
+
+By notation vote completed on July 29, 2008, the Committee unanimously approved the following resolution:
+
+Swap Authorization
+The Federal Open Market Committee directs the Federal Reserve Bank of New York to increase the amount available from the System Open Market Account under the existing reciprocal currency arrangement ("swap" arrangement) with the European Central Bank to an amount not to exceed $55 billion. Within that aggregate limit, draws of up to $25 billion are hereby authorized. The swap arrangement continues to be authorized through January 30, 2009, unless extended by the Federal Open Market Committee.
