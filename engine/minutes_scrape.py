@@ -19,7 +19,8 @@
 회의록은 회의 **3주 후** 공개 → 최근 회의는 미게시(404)일 수 있고, 그때는 조용히 건너뛴다.
 
 실행:
-  python3 engine/minutes_scrape.py            # DB 회의일 기준 미수집분 자동 수집
+  python3 engine/minutes_scrape.py            # 최근 120일 회의만 (매일 자동화용 기본값)
+  python3 engine/minutes_scrape.py all        # 전 회의 백필 (요청 많음 — 수동 1회용)
   python3 engine/minutes_scrape.py 2026       # 특정 연도만
   python3 engine/minutes_scrape.py 2026-01-28 # 특정 회의만
 의존: requests, beautifulsoup4
@@ -28,6 +29,7 @@ import re
 import sqlite3
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +38,7 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (AICP FOMC research)"}
 OUT_DIR = ROOT / "data" / "minutes"
 DB = ROOT / "data" / "fomc.db"
 DELAY = 1.0
+RECENT_DAYS = 120        # 매일 자동 실행 시 살펴볼 창(회의록은 회의 3주 후 공개)
 
 # 표준 6섹션 — 이 코드들만 README 에서 `*` 없이 나열(팀 관례)
 STANDARD = ("DFMOMO", "SRES", "SRFS", "SEO", "PVCCEO", "CPA")
@@ -242,17 +245,30 @@ def meeting_dates(year=None):
     return [d for d in rows if not year or d.startswith(str(year))]
 
 
+def recent_dates(days=RECENT_DAYS):
+    """최근 N일 안에 열린 회의만 — 매일 자동 실행용(과거 전체 재시도 방지).
+
+    회의록은 회의 3주 후 공개 → 120일 창이면 미게시분을 놓치지 않으면서
+    요청은 회의 2~3건으로 유지된다(과거 200여 회의를 매일 두드리지 않음).
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    return [d for d in meeting_dates() if d >= cutoff]
+
+
 def main():
     arg = sys.argv[1] if len(sys.argv) > 1 else None
     if arg and re.fullmatch(r"\d{4}-\d{2}-\d{2}", arg):
-        dates = [arg]
+        dates, scope = [arg], arg
     elif arg and re.fullmatch(r"\d{4}", arg):
-        dates = meeting_dates(arg)
-    else:
-        dates = meeting_dates()
+        dates, scope = meeting_dates(arg), f"{arg}년"
+    elif arg == "all":
+        dates, scope = meeting_dates(), "전체(백필)"
+    else:                                  # 기본 = 최근 창 (자동화 안전 기본값)
+        dates, scope = recent_dates(), f"최근 {RECENT_DAYS}일"
     if not dates:
-        raise SystemExit("회의일이 없습니다 — data/fomc.db 를 먼저 빌드하세요 (pipeline.py).")
-    print(f"회의록 수집 대상 {len(dates)}건 ({dates[0]} ~ {dates[-1]})")
+        print(f"수집 대상 없음 [{scope}] — 새 회의가 없거나 DB가 비었습니다.")
+        return
+    print(f"회의록 수집 [{scope}] {len(dates)}건 ({dates[0]} ~ {dates[-1]})")
     saved = collect(dates)
     print(f"\n신규 저장 {len(saved)}건 → {OUT_DIR}")
 
