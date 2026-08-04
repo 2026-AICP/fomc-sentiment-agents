@@ -8,7 +8,17 @@ DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$DIR"
 export PYTHONWARNINGS=ignore TRANSFORMERS_VERBOSITY=error TOKENIZERS_PARALLELISM=false
 
-echo "===== $(date '+%Y-%m-%d %H:%M:%S') 뉴스 데일리 자동화 시작 ====="
+echo "===== $(date '+%Y-%m-%d %H:%M:%S') 데일리 자동화 시작 ====="
+python3 engine/scrape.py 3           # ⓪ 최신 FOMC 성명문 증분 수집 (FOMC일이면 새 성명문 확보 → 에이전트가 흡수)
+# ⓪-b 회의록(minutes) — 회의 3주 후 공개라 매일 최근 창만 확인(공개되는 날 자동 수집).
+#     멱등이라 이미 있으면 요청조차 안 함. 실패해도 아래 뉴스 파이프라인은 계속 진행.
+python3 engine/minutes_scrape.py || echo "  warn: 회의록 수집 실패(건너뜀)"
 python3 agents/news_scheduler.py     # ① 수집 + FinBERT → 일별 News 지수 (+오늘의 감성)
 python3 analysis/daily_index.py      # ② Fed 계단 + 매일 News → 일별 결합(headline)
+TODAY_ET="$(TZ=America/New_York date +%F)"   # ③ 통합 에이전트 — 미국(ET) 오늘 날짜 기준
+python3 - "$TODAY_ET" <<'PY'
+import sys
+from agents import graph
+graph.orchestrate(dates=[sys.argv[1]])       # 오늘 1건: 신호 A~D(offset=0) → outputs/daily_signals.csv
+PY
 echo "===== $(date '+%Y-%m-%d %H:%M:%S') 완료 ====="
