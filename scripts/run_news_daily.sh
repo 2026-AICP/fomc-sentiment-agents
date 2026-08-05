@@ -21,6 +21,17 @@ TODAY_ET="$(TZ=America/New_York date +%F)"   # ③ 통합 에이전트 — 미�
 python3 - "$TODAY_ET" <<'PY'
 import sys
 from agents import graph
-graph.orchestrate(dates=[sys.argv[1]])       # 오늘 1건: 신호 A~D(offset=0) → outputs/daily_signals.csv
+from analysis.axis_status import pending_meetings, write_status
+
+# 오늘 + **미완성 회의 재방문**.
+# 세 축은 도착 시각이 다르다(성명문 당일 / 기자회견 며칠 후 / 회의록 3주 후).
+# 오늘 날짜만 처리하면 늦게 도착하는 축을 영원히 놓치므로, 최근 6개월 회의 중
+# 아직 3축이 안 찬 것을 매일 다시 돌려 새로 도착한 축을 흡수한다.
+today = sys.argv[1]
+pending = [d for d in pending_meetings() if d != today]
+if pending:
+    print(f"  재방문(축 미완성): {pending}")
+graph.orchestrate(dates=[today] + pending)   # 신호 A~D(offset=0) → outputs/daily_signals.csv
+write_status()                               # outputs/axis_status.csv 갱신
 PY
 echo "===== $(date '+%Y-%m-%d %H:%M:%S') 완료 ====="

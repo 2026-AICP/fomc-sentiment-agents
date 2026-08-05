@@ -46,9 +46,13 @@ def _signal_section(conn, date: str):
     return lines
 
 
-def _news_section(news, headline, pre_post=None, presser=None):
-    """Phase 7 — News 축·통합·발표전후(2d)·성명문vs기자회견(#4) 카드. 값을 넘길 때만 렌더."""
-    if not news and not headline and not pre_post and not presser:
+def _news_section(news, headline, pre_post=None, presser=None, minutes=None):
+    """Phase 7 — News 축·통합·발표전후(2d)·Fed 3축(성명문/회의록/기자회견) 카드.
+
+    값을 넘길 때만 렌더. 회의록은 회의 3주 후 공개라 당일 리포트엔 대개 비어 있고,
+    미완성 회의 재방문(analysis/axis_status) 때 채워져 리포트가 갱신된다.
+    """
+    if not news and not headline and not pre_post and not presser and not minutes:
         return []
     lines = ["", "## 5. News 축 & 통합 (Phase 7)"]
     if news:
@@ -76,11 +80,20 @@ def _news_section(news, headline, pre_post=None, presser=None):
             f"- **성명문 vs 기자회견 (#4): {presser['statement_tone']:+.3f} (성명문)"
             f" → {presser['tone']:+.3f} (기자회견, {presser['n_sentences']}문장)"
             f"  |  괴리 {presser['gap']:+.3f}**")
+    if minutes:                                        # Fed 3축: 회의록(3주 후 공개)
+        gap = minutes.get("gap")
+        gap_s = f"  |  괴리 {gap:+.3f}" if gap is not None else ""
+        lines.append(
+            f"- **회의록(minutes): {minutes['tone']:+.3f} ({minutes['n_sentences']}문장){gap_s}**")
+        secs = minutes.get("sections") or {}
+        if secs:
+            lines.append("  - 섹션별: " + " · ".join(f"{c} {v:+.3f}" for c, v in secs.items()))
     return lines
 
 
 def write_report(conn, date: str, report_dir, news: dict = None,
-                 headline: dict = None, pre_post: dict = None, presser: dict = None) -> Path:
+                 headline: dict = None, pre_post: dict = None, presser: dict = None,
+                 minutes: dict = None) -> Path:
     report_dir = Path(report_dir)
     report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -133,7 +146,7 @@ def write_report(conn, date: str, report_dir, news: dict = None,
         )
 
     lines += _signal_section(conn, date)
-    lines += _news_section(news, headline, pre_post, presser)
+    lines += _news_section(news, headline, pre_post, presser, minutes)
 
     out = report_dir / f"report_{date}.md"
     out.write_text("\n".join(lines), encoding="utf-8")

@@ -33,6 +33,7 @@ from analysis import collect_market as cm
 from analysis.analyze_alignment import get_reaction, get_ust2y_change, REACTION_OFFSET
 from analysis.news_index_live import index_for_window, index_pre_post
 from analysis.presser_index import presser_tone, has_presser
+from analysis.minutes_index import minutes_tone, has_minutes
 from analysis.headline import combine
 
 if os.getenv("SENTIMENT_ENGINE", "dummy").lower() == "finbert":
@@ -53,6 +54,7 @@ class State(TypedDict):
     news: dict
     pre_post: dict
     presser: dict
+    minutes: dict
     headline: dict
     market: dict
     signals: dict
@@ -173,6 +175,24 @@ def news_node(state: State) -> State:
                     f"[news] 성명문 {stmt:+.3f} vs 기자회견 {pt['conf_weighted']:+.3f} (괴리 {gap:+.3f})")
         except Exception as e:
             state["log"].append(f"[news] presser 톤 생략: {str(e)[:35]}")
+    # 회의록(minutes) 축 — 회의 3주 후 공개라, 그날 처리에는 대개 없다.
+    # 미완성 회의 재방문(run_news_daily → pending_meetings)에서 나중에 채워진다.
+    if state["statement_path"] and has_minutes(date):
+        try:
+            stmt = (state["index"] or {}).get("conf_weighted")
+            mt = minutes_tone(date, analyze=analyze)
+            if mt:
+                state["minutes"] = {
+                    "tone": mt["conf_weighted"], "statement_tone": stmt,
+                    "gap": (mt["conf_weighted"] - stmt) if stmt is not None else None,
+                    "n_sentences": mt["n_sentences"],
+                    "sections": {c: s["conf_weighted"] for c, s in mt["sections"].items()},
+                }
+                gap_s = f" (괴리 {state['minutes']['gap']:+.3f})" if stmt is not None else ""
+                state["log"].append(
+                    f"[news] 회의록 톤 {mt['conf_weighted']:+.3f}{gap_s} · {mt['n_sentences']}문장")
+        except Exception as e:
+            state["log"].append(f"[news] 회의록 톤 생략: {str(e)[:35]}")
     return state
 
 
@@ -272,7 +292,8 @@ def reporting_node(state: State) -> State:
                         news=state.get("news") or None,
                         headline=state.get("headline") or None,
                         pre_post=state.get("pre_post") or None,
-                        presser=state.get("presser") or None)
+                        presser=state.get("presser") or None,
+                        minutes=state.get("minutes") or None)
     conn.close()
     state["report_path"] = str(path)
     append_daily_signal({"date": state["date"],
@@ -307,7 +328,8 @@ def build_graph():
 
 def _init_state(date: str) -> dict:
     return {"date": date, "statement_path": "", "n_sentences": 0, "index": {},
-            "news": {}, "pre_post": {}, "presser": {}, "headline": {}, "market": {}, "signals": {},
+            "news": {}, "pre_post": {}, "presser": {}, "minutes": {}, "headline": {},
+            "market": {}, "signals": {},
             "report_path": "", "log": [], "errors": []}
 
 
