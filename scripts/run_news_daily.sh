@@ -13,6 +13,8 @@ python3 engine/scrape.py 3           # ⓪ 최신 FOMC 성명문 증분 수집 (
 # ⓪-b 회의록(minutes) — 회의 3주 후 공개라 매일 최근 창만 확인(공개되는 날 자동 수집).
 #     멱등이라 이미 있으면 요청조차 안 함. 실패해도 아래 뉴스 파이프라인은 계속 진행.
 python3 engine/minutes_scrape.py || echo "  warn: 회의록 수집 실패(건너뜀)"
+# ⓪-c 기자회견 트랜스크립트 — 회의 며칠 후 게시. 최근 4회의만 확인(멱등, 있으면 skip).
+python3 engine/presser_scrape.py || echo "  warn: 기자회견 수집 실패(건너뜀)"
 python3 agents/news_scheduler.py     # ① 수집 + FinBERT → 일별 News 지수 (+오늘의 감성)
 python3 analysis/daily_index.py      # ② Fed 계단 + 매일 News → 일별 결합(headline)
 TODAY_ET="$(TZ=America/New_York date +%F)"   # ③ 통합 에이전트 — 미국(ET) 오늘 날짜 기준
