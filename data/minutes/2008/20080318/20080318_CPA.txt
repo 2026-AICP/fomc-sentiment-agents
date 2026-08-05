@@ -1,0 +1,61 @@
+In the Committee's discussion of monetary policy for the intermeeting period, most members judged that a substantial easing in the stance of monetary policy was warranted at this meeting. The outlook for economic activity had weakened considerably since the January meeting, and members viewed the downside risks to economic growth as having increased. Indeed, some believed that a prolonged and severe economic downturn could not be ruled out given the further restriction of credit availability and ongoing weakness in the housing market. Members recognized that monetary policy alone could not address fully the underlying problems in the housing market and in financial markets, but they noted that, through a range of channels, lower short-term real interest rates should help buoy economic activity and ameliorate strains in these markets. Even with a substantial easing at this meeting, most members saw overall inflation as likely to moderate in coming quarters, reflecting a projected leveling-out of energy and commodity prices and an easing of pressures on resource utilization. However, inflation pressures had apparently risen even as the outlook for growth had weakened. With the uncertainties in the outlook for both economic activity and inflation elevated, members noted that appropriately calibrating the stance of policy was difficult, partly because some time would be required to assess the effects of the substantial easing of policy to date. All in all, members judged that a 75 basis point easing of policy at this meeting was appropriate to address the combination of risks of slowing economic growth, inflationary pressures, and financial market disruptions.
+
+The Committee agreed that the statement to be released after the meeting should indicate that economic activity had weakened further, reflecting slower growth in consumer spending and softening in the labor market, that financial markets remained under considerable stress, and that the tightening of credit conditions and the deepening of the housing market contraction were likely to weigh on economic growth over the next few quarters. Given recent developments, the Committee concurred that the statement should note that inflation had been elevated and that some indicators of inflation expectations had risen, but agreed that the announcement should also reiterate that inflation was expected to moderate in coming quarters. As in recent statements, the Committee emphasized that it would continue to monitor inflation developments carefully. The Federal Reserve had implemented a number of measures to foster market liquidity in recent weeks, and members thought that the statement should note that policy actions taken today and earlier, including those liquidity measures, would promote moderate growth over time. In light of the uncertainties regarding the housing sector and financial market developments, however, the Committee repeated its recent indications that downside risks to growth remained. The Committee agreed on the need to act in a timely manner to promote its dual objectives of sustainable economic growth and price stability.
+
+At the conclusion of the discussion, the Committee voted to authorize and direct the Federal Reserve Bank of New York, until it was instructed otherwise, to execute transactions in the System Account in accordance with the following domestic policy directive:
+
+"The Federal Open Market Committee seeks monetary and financial conditions that will foster price stability and promote sustainable growth in output. To further its long-run objectives, the Committee in the immediate future seeks conditions in reserve markets consistent with reducing the federal funds rate to an average of around 2-1/4 percent."
+
+The vote encompassed approval of the statement below to be released at 2:15 p.m.:
+
+"The Federal Open Market Committee decided today to lower its target for the federal funds rate 75 basis points to 2-1/4 percent.
+
+Recent information indicates that the outlook for economic activity has weakened further. Growth in consumer spending has slowed and labor markets have softened. Financial markets remain under considerable stress, and the tightening of credit conditions and the deepening of the housing contraction are likely to weigh on economic growth over the next few quarters.
+
+Inflation has been elevated, and some indicators of inflation expectations have risen. The Committee expects inflation to moderate in coming quarters, reflecting a projected leveling-out of energy and other commodity prices and an easing of pressures on resource utilization. Still, uncertainty about the inflation outlook has increased. It will be necessary to continue to monitor inflation developments carefully.
+
+Today's policy action, combined with those taken earlier, including measures to foster market liquidity, should help to promote moderate growth over time and to mitigate the risks to economic activity. However, downside risks to growth remain. The Committee will act in a timely manner as needed to promote sustainable economic growth and price stability."
+
+Votes for this action: Messrs. Bernanke, Geithner, Kohn, Kroszner, and Mishkin, Ms. Pianalto, Messrs. Stern and Warsh.
+
+Votes against this action: Messrs. Fisher and Plosser.
+
+Messrs. Fisher and Plosser dissented because, in light of heightened inflation risks, they favored easing policy less aggressively. Incoming data suggested a weaker near-term outlook for economic growth, but the Committee's earlier policy moves had already reduced the target federal funds rate by 225 basis points to address risks to growth, and the full effect of those rate cuts had yet to be felt. While financial markets remained under stress, the Federal Reserve had already taken separate, significant actions to address liquidity issues in markets. In fact, Mr. Fisher felt that focusing on measures targeted at relieving liquidity strains would improve economic prospects more quickly and lastingly than would further reductions in the federal funds rate at this point; he believed that alleviating these strains would increase the efficacy of the earlier rate cuts. Both Messrs. Fisher and Plosser were concerned that inflation expectations could potentially become unhinged should the Committee continue to lower the funds rate in the current environment. They pointed to measures of inflation and indicators of inflation expectations that had risen, and Mr. Fisher stressed the international influences on U.S. inflation rates. Mr. Plosser noted that the Committee could not afford to wait until there was clear evidence that inflation expectations were no longer anchored, as by then it would be too late to prevent a further increase in inflation pressures.
+
+It was agreed that the next meeting of the Committee would be held on Tuesday-Wednesday, April 29-30, 2008.
+
+The meeting adjourned at 1:15 p.m.
+
+Notation Vote
+By notation vote completed on February 19, 2008, the Committee unanimously approved the minutes of the FOMC meeting held on January 29-30, 2008.
+
+Conference Call
+On March 10, 2008, the Committee met to review financial market developments and to consider proposals aimed at supporting the liquidity and orderly functioning of those markets. In light of the sharp further deterioration of some key money and credit markets, and against the backdrop of a weaker economic outlook, meeting participants discussed the potential usefulness and risks of instituting a Term Securities Lending Facility, under which primary dealers would be able to borrow Treasury securities for a term of approximately one month against any collateral eligible for open market operations and the highest-quality private mortgage securities. Most participants concluded that offering this facility was an appropriate step that could help alleviate pressures in the financing markets for Treasury and some mortgage-backed securities. By improving conditions in funding markets, the measure was expected to help restore the functioning of financial markets more generally and thereby promote the effective conduct of monetary policy as well as macroeconomic stability. During the discussion, participants expressed concerns that establishment of the facility could be viewed as setting a precedent and thus raise expectations of other actions in the future, and they also noted some uncertainty about how effective the facility would be in practice. On balance, the Committee decided that the facility could prove useful in preventing an escalation of an unhealthy dynamic that was developing in money and credit markets, in which liquidity and collateral concerns were spreading. In addition, the Committee agreed to expand and extend the existing reciprocal currency agreements with the European Central Bank and the Swiss National Bank.
+
+The Committee voted to approve the following resolutions:
+
+Term Securities Lending Facility.
+In addition to the current authorization granted to the Federal Reserve Bank of New York to engage in overnight securities lending transactions, and in order to ensure the effective conduct of open market operations, the Federal Open Market Committee authorizes the Federal Reserve Bank of New York to lend up to $200 billion of U.S. Government securities held in the System Open Market Account to primary dealers for a term that does not exceed 35 days at rates that shall be determined by competitive bidding.
+
+These lending transactions may be against pledges of U.S. Government securities, other assets that the Reserve Bank is specifically authorized to buy and sell under section 14 of the Federal Reserve Act (including federal agency residential-mortgage-backed securities (MBS)), and non-agency AAA-rated residential MBS.
+
+The Federal Reserve Bank of New York shall set a minimum lending fee consistent with the objectives of the program and apply reasonable limitations on the total amount of a specific issue that may be auctioned and on the amount of securities that each dealer may borrow.
+
+The Federal Reserve Bank of New York may reject bids which could facilitate a dealer's ability to control a single issue as determined solely by the Federal Reserve Bank of New York.
+
+This authority shall expire at such time as determined by the Federal Open Market Committee or the Board of Governors.
+
+Secretary's note: By notation vote completed on March 20, 2008, the Committee unanimously approved a resolution that added non-agency AAA-rated commercial-mortgage-backed securities to the list of collateral acceptable in connection with the Term Securities Lending Facility.
+
+Swap Authorizations.
+The Federal Open Market Committee directs the Federal Reserve Bank of New York to increase the amount available from the System Open Market Account under the existing reciprocal currency arrangement ("swap" arrangement) with the European Central Bank to an amount not to exceed $30 billion. Within that aggregate limit, draws of up to $15 billion are hereby authorized. The current swap arrangement shall be extended until September 30, 2008, unless further extended by the Federal Open Market Committee.
+
+The Federal Open Market Committee directs the Federal Reserve Bank of New York to increase the amount available from the System Open Market Account under the existing reciprocal currency arrangement ("swap" arrangement) with the Swiss National Bank to an amount not to exceed $6 billion. Draws are authorized up to the full amount of the swap. The current swap arrangement shall be extended until September 30, 2008, unless further extended by the Federal Open Market Committee.
+
+Votes for these actions: Messrs. Bernanke, Geithner, Fisher, Kohn, and Kroszner, Ms. Pianalto, Messrs. Plosser and Warsh, and Ms. Yellen.
+
+Votes against these actions: None.
+
+Absent and not voting: Mr. Mishkin.
+
+Ms. Yellen voted as alternate membe

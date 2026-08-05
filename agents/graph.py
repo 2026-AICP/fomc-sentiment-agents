@@ -27,11 +27,13 @@ import db
 from engine.preprocess import split_sentences
 from index.aggregate import aggregate_meeting
 from reports.report import write_report
-from analysis.signals import (signal_tone_shift, signal_divergence,
-                              signal_tone_vs_vix, grade)
+from analysis.signals import (signal_tone_shift, signal_divergence, signal_tone_vs_vix,
+                              signal_tone_vs_rate, grade, COMBINED_THRESHOLDS)
 from analysis import collect_market as cm
-from analysis.analyze_alignment import get_reaction, REACTION_OFFSET
-from analysis.news_index_live import index_for_window
+from analysis.analyze_alignment import get_reaction, get_ust2y_change, REACTION_OFFSET
+from analysis.news_index_live import index_for_window, index_pre_post
+from analysis.presser_index import presser_tone, has_presser
+from analysis.minutes_index import minutes_tone, has_minutes
 from analysis.headline import combine
 
 if os.getenv("SENTIMENT_ENGINE", "dummy").lower() == "finbert":
@@ -39,8 +41,9 @@ if os.getenv("SENTIMENT_ENGINE", "dummy").lower() == "finbert":
 else:
     from engine.dummy_sentiment import analyze, MODEL_TAG
 
-DB = ROOT / "data" / "agent_skeleton.db"
+DB = ROOT / "data" / "fomc.db"           # 통일 DB — pipeline·signals·collect_market 과 공유(이중 DB 제거)
 REPORTS = ROOT / "reports" / "agent_out"
+DAILY_SIGNALS = ROOT / "outputs" / "daily_signals.csv"
 
 
 class State(TypedDict):
@@ -49,6 +52,9 @@ class State(TypedDict):
     n_sentences: int
     index: dict
     news: dict
+    pre_post: dict
+    presser: dict
+    minutes: dict
     headline: dict
     market: dict
     signals: dict
@@ -117,6 +123,14 @@ def news_node(state: State) -> State:
     실시간 뉴스가 없으면(과거 회의) News=없음 → headline=Fed 단독 폴백.
     """
     date = state["date"]
+    if not state["index"]:                       # 일별 모드(analyst 건너뜀) → Fed 톤 이월
+        from analysis.analyze_alignment import fed_tone_asof
+        conn = db.connect(DB); db.init_db(conn)
+        carry = fed_tone_asof(conn, date)
+        conn.close()
+        if carry is not None:
+            state["index"] = {"conf_weighted": round(carry, 4)}
+            state["log"].append(f"[news] Fed 이월 {carry:+.3f} (일별 모드)")
     fed = state["index"].get("conf_weighted") if state["index"] else None
     before = int(os.getenv("NEWS_WINDOW_BEFORE", "3"))
     after = int(os.getenv("NEWS_WINDOW_AFTER", "1"))
@@ -134,6 +148,51 @@ def news_node(state: State) -> State:
     if h:
         state["headline"] = h
         state["log"].append(f"[news] headline {h['headline']:+.3f} ({h['method']})")
+    # 2d Step 2: FOMC일이면 성명문(2pm ET) 전/후 뉴스 감성 분리 (시각 있는 수집분에만 유효)
+    if state["statement_path"]:
+        try:
+            pp = index_pre_post(meeting_date=date, after_days=1)
+            state["pre_post"] = pp
+            if pp["shift"] is not None:
+                state["log"].append(
+                    f"[news] 발표 전/후 {pp['pre']['conf_weighted']:+.3f}"
+                    f"→{pp['post']['conf_weighted']:+.3f} (변화 {pp['shift']:+.3f})")
+            elif pp["pre"] or pp["post"]:
+                state["log"].append("[news] 발표 전/후 한쪽 뉴스만 → 변화 계산 불가")
+        except Exception as e:
+            state["log"].append(f"[news] pre/post 생략: {str(e)[:35]}")
+    # #4 Step 3(B1): FOMC일 & presser 트랜스크립트 있으면 성명문 vs presser 톤 괴리
+    # (트랜스크립트는 회의 며칠 후 게시 → 그때 재실행 때 잡힘. 성명문과 같은 analyze 로 공정 비교.)
+    if state["statement_path"] and has_presser(date):
+        try:
+            stmt = (state["index"] or {}).get("conf_weighted")
+            pt = presser_tone(date, analyze=analyze)
+            if pt and stmt is not None:
+                gap = pt["conf_weighted"] - stmt
+                state["presser"] = {"tone": pt["conf_weighted"], "statement_tone": stmt,
+                                    "gap": gap, "n_sentences": pt["n_sentences"]}
+                state["log"].append(
+                    f"[news] 성명문 {stmt:+.3f} vs 기자회견 {pt['conf_weighted']:+.3f} (괴리 {gap:+.3f})")
+        except Exception as e:
+            state["log"].append(f"[news] presser 톤 생략: {str(e)[:35]}")
+    # 회의록(minutes) 축 — 회의 3주 후 공개라, 그날 처리에는 대개 없다.
+    # 미완성 회의 재방문(run_news_daily → pending_meetings)에서 나중에 채워진다.
+    if state["statement_path"] and has_minutes(date):
+        try:
+            stmt = (state["index"] or {}).get("conf_weighted")
+            mt = minutes_tone(date, analyze=analyze)
+            if mt:
+                state["minutes"] = {
+                    "tone": mt["conf_weighted"], "statement_tone": stmt,
+                    "gap": (mt["conf_weighted"] - stmt) if stmt is not None else None,
+                    "n_sentences": mt["n_sentences"],
+                    "sections": {c: s["conf_weighted"] for c, s in mt["sections"].items()},
+                }
+                gap_s = f" (괴리 {state['minutes']['gap']:+.3f})" if stmt is not None else ""
+                state["log"].append(
+                    f"[news] 회의록 톤 {mt['conf_weighted']:+.3f}{gap_s} · {mt['n_sentences']}문장")
+        except Exception as e:
+            state["log"].append(f"[news] 회의록 톤 생략: {str(e)[:35]}")
     return state
 
 
@@ -149,14 +208,16 @@ def market_node(state: State) -> State:
         state["log"].append(f"[market] {len(win)}거래일 적재")
     except Exception as e:
         state["log"].append(f"[market] 다운로드 생략(오프라인?): {str(e)[:35]}")
-    # 반응은 검증된 규약(analyze_alignment.get_reaction, 기본 발표+1거래일)과 동일하게 —
-    # 리포트 §4 신호 카드와 항상 일치(부호 불일치 방지). 규약 변경은 REACTION_OFFSET 한 곳.
-    reac = get_reaction(conn, date, offset=REACTION_OFFSET)
+    # 통합 에이전트는 라이브(당일=offset=0)로 비교 — 오늘 톤 vs 오늘 시장.
+    # (offset=1 회의 백테스트는 analysis/signals.py main 에서 별도 유지.)
+    reac = get_reaction(conn, date, 0)               # 당일(offset=0)
+    rate_chg = get_ust2y_change(conn, date, 0)       # 2년물 변화; 데이터 없으면 None(신호 D 미발동)
     if reac:
         rdate, spx, vixc = reac
         vlv = conn.execute("SELECT vix FROM market WHERE date=?", (rdate,)).fetchone()
         state["market"] = {"spx_ret_cc": spx, "vix_chg": vixc,
-                           "vix": vlv[0] if vlv else None, "reaction_date": rdate}
+                           "vix": vlv[0] if vlv else None, "ust2y_chg": rate_chg,
+                           "reaction_date": rdate}
     conn.close()
     state["log"].append(f"[market] 반응 {state['market'] or '(없음)'}")
     return state
@@ -167,42 +228,85 @@ def strategy_node(state: State) -> State:
     if not state["index"]:
         state["log"].append("[strategy] 인덱스 없음 → 건너뜀")
         return state
-    date = state["date"]
-    tone = state["index"].get("conf_weighted")
+    # 신호 톤 = 결합(News+Fed) 지수 — 검증된 두 축 이점(-0.534)을 신호에 반영.
+    tone = (state.get("headline") or {}).get("headline")
+    if tone is None:                                  # 결합 없으면 Fed 단독 z 로 폴백
+        tone = (combine(state["index"].get("conf_weighted"), None) or {}).get("headline")
     reaction = state["market"].get("spx_ret_cc")
     vix_chg = state["market"].get("vix_chg")
-    conn = db.connect(DB)
-    prev = conn.execute(
-        "SELECT index_value FROM meetings WHERE method='conf_weighted' "
-        "AND granularity='meeting' AND date<? ORDER BY date DESC LIMIT 1", (date,)).fetchone()
-    conn.close()
-    prev_tone: Optional[float] = prev[0] if prev else None
+    rate_chg = state["market"].get("ust2y_chg")
+    prev_tone = _prev_combined(state["date"])         # 직전 결합 지수 (daily_signals.csv)
 
-    sigs = [signal_tone_shift(prev_tone, tone),
-            signal_divergence(tone, reaction),
-            signal_tone_vs_vix(tone, vix_chg)]
+    th = COMBINED_THRESHOLDS                           # 결합 척도용 θ (theta_t 0.22, theta_shift 0.95)
+    sigs = [signal_tone_shift(prev_tone, tone, th.theta_shift),
+            signal_divergence(tone, reaction, th.theta_t, th.theta_m),
+            signal_tone_vs_vix(tone, vix_chg, th.theta_t, th.theta_vix),
+            signal_tone_vs_rate(tone, rate_chg, th.theta_t, th.theta_rate)]
     g = grade(sigs, tone, reaction)
     fired = [s.name for s in sigs if s.fired]
     state["signals"] = {"grade": g, "fired": fired}
-    state["log"].append(f"[strategy] 등급 {g} | 발동 {fired or '없음'}")
+    tstr = f"{tone:+.3f}" if tone is not None else "—"
+    state["log"].append(f"[strategy] 등급 {g} (결합톤 {tstr}) | 발동 {fired or '없음'}")
     return state
 
 
 # ── ⑤ Reporting ──
+def append_daily_signal(rec: dict, out=None):
+    """일별 신호 1행 누적(같은 날짜는 덮어쓰기). 최신일이 마지막 행 → 대시보드·기록용."""
+    import csv
+    out = Path(out or DAILY_SIGNALS)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    rows = {}
+    if out.exists():
+        for r in csv.DictReader(open(out, encoding="utf-8")):
+            rows[r["date"]] = r
+    rows[rec["date"]] = {"date": rec["date"], "grade": rec["grade"],
+                         "index": round(rec.get("index") or 0.0, 4),
+                         "fired": ";".join(rec.get("fired") or [])}
+    with open(out, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["date", "grade", "index", "fired"])
+        w.writeheader()
+        for d in sorted(rows):
+            w.writerow(rows[d])
+
+
+def _prev_combined(date, out=None):
+    """date 직전(가장 최근 이전 날)의 결합 지수 — daily_signals.csv. 없으면 None(첫 실행)."""
+    import csv
+    out = Path(out or DAILY_SIGNALS)
+    if not out.exists():
+        return None
+    prev = None
+    for r in csv.DictReader(open(out, encoding="utf-8")):
+        if r.get("date", "") < date:
+            try:
+                prev = float(r["index"])
+            except (KeyError, ValueError, TypeError):
+                pass
+    return prev
+
+
 def reporting_node(state: State) -> State:
     conn = db.connect(DB)
     path = write_report(conn, state["date"], REPORTS,
                         news=state.get("news") or None,
-                        headline=state.get("headline") or None)
+                        headline=state.get("headline") or None,
+                        pre_post=state.get("pre_post") or None,
+                        presser=state.get("presser") or None,
+                        minutes=state.get("minutes") or None)
     conn.close()
     state["report_path"] = str(path)
-    state["log"].append(f"[reporting] {path.name}")
+    append_daily_signal({"date": state["date"],
+                         "grade": state["signals"].get("grade", "—"),
+                         "index": (state.get("headline") or {}).get("headline"),  # 결합(뉴스포함)
+                         "fired": state["signals"].get("fired", [])})
+    state["log"].append(f"[reporting] {path.name} + daily_signals.csv")
     return state
 
 
-def _route_after_collect(state: State) -> str:
-    """성명문을 못 찾으면 이후 단계 건너뛰고 종료 (라우팅)."""
-    return "analyst" if state["statement_path"] else "skip"
+def route_after_collect(state: State) -> str:
+    """성명문 있으면 analyst(회의 모드), 없으면 news(일별 모드 — Fed 이월)."""
+    return "analyst" if state["statement_path"] else "news"
 
 
 def build_graph():
@@ -212,8 +316,8 @@ def build_graph():
                      ("strategy", strategy_node), ("reporting", reporting_node)]:
         g.add_node(name, fn)
     g.set_entry_point("collector")
-    g.add_conditional_edges("collector", _route_after_collect,
-                            {"analyst": "analyst", "skip": END})
+    g.add_conditional_edges("collector", route_after_collect,
+                            {"analyst": "analyst", "news": "news"})
     g.add_edge("analyst", "news")
     g.add_edge("news", "market")
     g.add_edge("market", "strategy")
@@ -224,7 +328,8 @@ def build_graph():
 
 def _init_state(date: str) -> dict:
     return {"date": date, "statement_path": "", "n_sentences": 0, "index": {},
-            "news": {}, "headline": {}, "market": {}, "signals": {},
+            "news": {}, "pre_post": {}, "presser": {}, "minutes": {}, "headline": {},
+            "market": {}, "signals": {},
             "report_path": "", "log": [], "errors": []}
 
 

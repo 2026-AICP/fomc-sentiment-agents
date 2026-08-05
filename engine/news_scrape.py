@@ -42,7 +42,7 @@ _M_RE = re.compile(
     r"money supply|open market operation|quantitative easing|monetary polic|"
     r"fed funds rate|overnight lending rate|interest rate|"
     r"lender of last resort|discount window|central bank|fed chair(?:man)?|"
-    r"bernanke|vol[ck]er|greenspan|yellen|powell|\bwarsh\b|"
+    r"bernanke|vol[ck]+er|greenspan|yellen|powell|\bwarsh\b|"
     r"european central bank|\becb\b|bank of england|bank of japan|\bboj\b|"
     r"bank of china|bundesbank|bank of france|bank of italy",
     re.IGNORECASE,
