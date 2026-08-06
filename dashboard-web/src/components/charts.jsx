@@ -10,7 +10,7 @@ const TIP = {
   labelStyle: { color: "#e9ebef" },
 };
 
-export function IndexArea({ data, x = "date", y, color = "var(--accent)", height = 240 }) {
+export function IndexArea({ data, x = "date", y, color = "#f9812f", height = 240 }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 6, right: 8, left: -14, bottom: 0 }}>
