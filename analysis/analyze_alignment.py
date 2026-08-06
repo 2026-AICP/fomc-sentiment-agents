@@ -42,6 +42,17 @@ def get_meeting_tone(con, agg=AGG_METHOD):
     return rows   # [(date, tone), ...]
 
 
+def fed_tone_asof(con, date, method=AGG_METHOD):
+    """date 시점 Fed 톤 = 그날 이전(포함) 마지막 회의의 index_value (이월). 없으면 None.
+
+    일별(비-FOMC) 날에도 Fed 축을 유지하기 위한 carry-forward. 통합 에이전트가 사용.
+    """
+    row = con.execute(
+        "SELECT index_value FROM meetings WHERE method=? AND granularity='meeting' "
+        "AND date<=? ORDER BY date DESC LIMIT 1", (method, date)).fetchone()
+    return row[0] if row else None
+
+
 def get_reaction(con, meeting_date, offset=REACTION_OFFSET):
     """회의일 기준 offset 거래일 뒤의 시장 반응(수익률·VIX변화)을 가져온다.
 

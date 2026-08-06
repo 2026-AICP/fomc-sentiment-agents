@@ -190,13 +190,28 @@ def load_market_daily(dates) -> dict:
     return out
 
 
+def save_alerts(alerts: List[Alert], out: Path = ROOT / "outputs" / "news_signals.csv") -> Path:
+    """일별 신호를 CSV로 저장 (대시보드·기록용). 최신일이 마지막 행."""
+    import csv as csvmod
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "w", newline="", encoding="utf-8") as f:
+        w = csvmod.writer(f)
+        w.writerow(["date", "level", "value", "n_articles", "fired", "detail", "gate_reason"])
+        for a in alerts:
+            fired = ";".join(s.name for s in a.signals if s.fired)
+            detail = " · ".join(s.detail for s in a.signals if s.fired)
+            w.writerow([a.date, a.level, round(a.value, 4), a.n_articles, fired, detail, a.gate_reason or ""])
+    return out
+
+
 def main():
     if not NEWS_CSV.exists():
         raise SystemExit(f"News 지수 CSV 없음: {NEWS_CSV}\n먼저 agents/news_scheduler.py 실행")
     series = load_series()
     market = load_market_daily([r["date"] for r in series])
     alerts = build_alerts(series, market)
-    print(f"\n일별 News 신호 {len(alerts)}일 (규칙 기반, LLM 미사용)\n── 오늘의 신호 ──")
+    out = save_alerts(alerts)
+    print(f"\n일별 News 신호 {len(alerts)}일 (규칙 기반, LLM 미사용) → 저장 {out.relative_to(ROOT)}\n── 오늘의 신호 ──")
     for a in alerts:
         print(f"{a.level}  [{a.date}]  감성 {a.value:+.3f} (기사 {a.n_articles}건)")
         for s in a.signals:

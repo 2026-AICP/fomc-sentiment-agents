@@ -34,4 +34,8 @@ if pending:
 graph.orchestrate(dates=[today] + pending)   # 신호 A~D(offset=0) → outputs/daily_signals.csv
 write_status()                               # outputs/axis_status.csv 갱신
 PY
+# ④ 대시보드 데이터 갱신 — 프론트는 계산하지 않고 이 JSON만 읽는다(환각 차단).
+#    실패해도 위 파이프라인 결과는 이미 저장됐으므로 경고만 남긴다.
+python3 analysis/export_dashboard.py dashboard-web/public/data \
+  || echo "  warn: 대시보드 JSON 갱신 실패(건너뜀)"
 echo "===== $(date '+%Y-%m-%d %H:%M:%S') 완료 ====="
