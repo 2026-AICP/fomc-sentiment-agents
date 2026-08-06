@@ -100,6 +100,32 @@ def export_presser():
             for r in _csv_rows(ROOT / "outputs" / "presser_tones.csv")]
 
 
+# 회의록 표준 6섹션 (analysis/minutes_index.SECTIONS 와 동일)
+_MIN_SECTIONS = ("DFMOMO", "SRES", "SRFS", "SEO", "PVCCEO", "CPA")
+
+
+def export_minutes():
+    """회의별 회의록 톤 + 성명문 대비 괴리 + 섹션별 톤 (minutes_backfill 산출)."""
+    out = []
+    for r in _csv_rows(ROOT / "outputs" / "minutes_tones.csv"):
+        row = {"date": r["date"], "statement": _f(r.get("statement")),
+               "minutes": _f(r.get("minutes")), "gap": _f(r.get("gap")),
+               "n_sentences": int(r["n_sentences"]) if r.get("n_sentences") else None}
+        row["sections"] = {c: _f(r.get(c)) for c in _MIN_SECTIONS if _f(r.get(c)) is not None}
+        out.append(row)
+    return out
+
+
+def export_axis_status():
+    """회의별 3축(성명문·회의록·기자회견) 보유 현황 — 무엇이 아직 안 왔는지."""
+    return [{"date": r["date"], "statement": r["statement"] == "1",
+             "minutes": r["minutes"] == "1",
+             "presser": (r["presser"] == "1") if r.get("presser") else None,
+             "n_axes": int(r["n_axes"]), "expected": int(r["expected"]),
+             "complete": r["complete"] == "1"}
+            for r in _csv_rows(ROOT / "outputs" / "axis_status.csv")]
+
+
 def export_meta(con, counts):
     """검증·유의성 수치 — 검증 스크립트로 확정된 값(문서 §참조). 프론트는 표시만."""
     norm = json.loads((ROOT / "analysis" / "headline_norm.json").read_text())
@@ -123,6 +149,14 @@ def export_meta(con, counts):
             "p_sign_test": 1.7e-13,
             "note": "기자회견 톤이 성명문보다 일관되게 신중 (2011~2026, 4의장)",
         },
+        "minutes_finding": {                  # analysis/minutes_backfill
+            "n_meetings": 214, "pct_more_cautious": 0.75, "mean_gap": -0.0645,
+            "p_sign_test": 7.5e-14,
+            "axis_means": {"statement": 0.169, "minutes": 0.088, "presser": 0.055},
+            "axis_corr": {"stmt_minutes": 0.70, "stmt_presser": 0.46, "minutes_presser": 0.56},
+            "note": "공식 문서일수록 낙관적(성명문>회의록>기자회견). 축 상관 0.46~0.70 = "
+                    "서로 다른 정보 → 축별 분리 분석의 근거",
+        },
     }
 
 
@@ -140,6 +174,8 @@ def main():
         "daily_signals.json": export_daily_signals(),
         "market.json": export_market(con),
         "presser.json": export_presser(),
+        "minutes.json": export_minutes(),
+        "axis_status.json": export_axis_status(),
     }
     counts = {k.replace(".json", ""): len(v) for k, v in files.items()}
     files["meta.json"] = export_meta(con, counts)

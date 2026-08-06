@@ -5,6 +5,7 @@ import News from "./pages/News";
 import Market from "./pages/Market";
 import Divergence from "./pages/Divergence";
 import Presser from "./pages/Presser";
+import Minutes from "./pages/Minutes";
 import Method from "./pages/Method";
 
 const PAGES = [
@@ -14,6 +15,7 @@ const PAGES = [
   { key: "market", label: "🪙 시장 축", el: <Market /> },
   { key: "divergence", label: "🚩 괴리 검증", el: <Divergence /> },
   { key: "presser", label: "🎙 기자회견", el: <Presser /> },
+  { key: "minutes", label: "📝 회의록", el: <Minutes /> },
   { key: "method", label: "🔬 방법론·한계", el: <Method /> },
 ];
 
