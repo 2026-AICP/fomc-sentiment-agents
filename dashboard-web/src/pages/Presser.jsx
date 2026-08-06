@@ -16,10 +16,10 @@ export default function Presser() {
       <div className="kpis">
         <Kpi eyebrow="기자회견이 더 신중"
           value={<span style={{ color: "var(--accent)" }}>{Math.round(pf.pct_more_cautious * 100)}%</span>}
-          meta={`${pf.n_meetings}회의 중 · 부호검정 p<10⁻¹²`} />
+          meta={`${pf.n_meetings}회의 중 · 부호검정 p=${pf.p_sign_test.toExponential(1)}`} />
         <Kpi eyebrow="평균 괴리 (기자회견 − 성명문)" value={fmt(pf.mean_gap)}
           meta="일관되게 음수 = Q&A가 방어적" />
-        <Kpi eyebrow="가장 큰 후퇴" value="−0.372" meta="2018-06-13 (긴축기) · Warsh 취임 −0.276" />
+        <Kpi eyebrow="가장 큰 후퇴" value="−0.501" meta="2018-09-26 (긴축기) · Warsh 첫 회의 −0.431" />
       </div>
 
       <h2 className="sec">회의별 톤 — 성명문 vs 기자회견</h2>

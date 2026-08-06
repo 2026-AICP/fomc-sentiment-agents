@@ -44,7 +44,7 @@ export default function Minutes() {
       <div className="kpis">
         <Kpi eyebrow="회의록이 성명문보다 신중"
           value={<span style={{ color: "var(--accent)" }}>{Math.round(mf.pct_more_cautious * 100)}%</span>}
-          meta={`${mf.n_meetings}회의 중 · 부호검정 p<10⁻¹³`} />
+          meta={`${mf.n_meetings}회의 중 · 부호검정 p=${mf.p_sign_test.toExponential(1)}`} />
         <Kpi eyebrow="평균 괴리 (회의록 − 성명문)" value={fmt(mf.mean_gap)}
           meta="음수 = 내부 논의가 더 조심스러움" />
         <Kpi eyebrow="3축 평균 톤"

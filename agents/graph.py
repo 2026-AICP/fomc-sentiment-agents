@@ -295,6 +295,16 @@ def reporting_node(state: State) -> State:
                         presser=state.get("presser") or None,
                         minutes=state.get("minutes") or None)
     conn.close()
+    # 축 톤을 CSV에 upsert — 대시보드 JSON(export_dashboard)의 입력이라, 여기서 갱신해야
+    # 새 회의·늦게 도착한 축이 배치 재실행 없이 대시보드에 반영된다.
+    try:
+        from analysis.tone_store import save_minutes, save_presser
+        if state.get("presser"):
+            save_presser(state["date"], state["presser"])
+        if state.get("minutes"):
+            save_minutes(state["date"], state["minutes"])
+    except Exception as e:
+        state["log"].append(f"[reporting] 톤 CSV 갱신 생략: {str(e)[:35]}")
     state["report_path"] = str(path)
     append_daily_signal({"date": state["date"],
                          "grade": state["signals"].get("grade", "—"),

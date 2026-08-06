@@ -144,17 +144,19 @@ def export_meta(con, counts):
             "p_permutation": 0.001, "p_fisher": 0.0008,
             "note": "위기 예측이 아닌 attention signal — 추가 검토 필요 표시",
         },
-        "presser_finding": {                  # analysis/presser_backfill (docs/presser_analysis.md)
-            "n_meetings": 92, "pct_more_cautious": 0.87, "mean_gap": -0.113,
-            "p_sign_test": 1.7e-13,
+        # ↓ 세 축 모두 **원본 FinBERT(T=1)** 로 재점수화한 값 (2026-08 기준).
+        #   이전 수치는 성명문만 T=3.1 시절 DB 값이라 축 간 스케일이 섞여 있었다.
+        "presser_finding": {                  # analysis/presser_backfill
+            "n_meetings": 93, "pct_more_cautious": 0.73, "mean_gap": -0.1303,
+            "p_sign_test": 9.4e-06,
             "note": "기자회견 톤이 성명문보다 일관되게 신중 (2011~2026, 4의장)",
         },
         "minutes_finding": {                  # analysis/minutes_backfill
-            "n_meetings": 214, "pct_more_cautious": 0.75, "mean_gap": -0.0645,
-            "p_sign_test": 7.5e-14,
-            "axis_means": {"statement": 0.169, "minutes": 0.088, "presser": 0.055},
-            "axis_corr": {"stmt_minutes": 0.70, "stmt_presser": 0.46, "minutes_presser": 0.56},
-            "note": "공식 문서일수록 낙관적(성명문>회의록>기자회견). 축 상관 0.46~0.70 = "
+            "n_meetings": 214, "pct_more_cautious": 0.68, "mean_gap": -0.0692,
+            "p_sign_test": 1.0e-07,
+            "axis_means": {"statement": 0.185, "minutes": 0.088, "presser": 0.056},
+            "axis_corr": {"stmt_minutes": 0.67, "stmt_presser": 0.34, "minutes_presser": 0.49},
+            "note": "공식 문서일수록 낙관적(성명문>회의록>기자회견). 축 상관 0.34~0.67 = "
                     "서로 다른 정보 → 축별 분리 분석의 근거",
         },
     }
