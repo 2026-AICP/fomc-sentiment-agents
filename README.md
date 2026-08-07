@@ -8,6 +8,10 @@ News & Fed Sentiment Index를 산출하고, S&P500·VIX 등 시장 지표와 비
 작년 프로젝트 [`Qsdg812/fomc---index`](https://github.com/Qsdg812/fomc---index)의
 아이디어를 이어받아 새로 구축. 일부 전처리 로직을 참고함.
 
+> 🧭 **팀원이라면 먼저 [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) 를 읽으세요** —
+> 브랜치 두 개(main/deploy), 브랜치 전환 시 데이터 삭제 주의, 매일 도는 자동화, 사이트 배포 규칙.
+> 사이트: **https://aicp-econpilot.github.io/**
+
 ## 현재 상태
 - **Phase 0~2** ✅ 스캐폴딩 + 더미 엔진 end-to-end
 - **Phase 3** ✅ FinBERT 엔진 통합 (작년 파인튜닝 모델, 원본 T=1)
