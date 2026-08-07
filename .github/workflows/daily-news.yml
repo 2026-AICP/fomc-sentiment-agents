@@ -75,6 +75,9 @@ jobs:
           if git diff --cached --quiet; then
             echo "변경 없음 — 새 뉴스/신호 없음. 커밋 생략."
           else
-            git commit -m "chore: daily news signal refresh [skip ci]"
+            # [skip ci] 를 붙이지 않는다 — 이 커밋이 Pages 배포(pages.yml)를 깨워야
+            # 매일 갱신된 데이터가 실제 사이트에 반영된다. 이 워크플로 자체는
+            # schedule/workflow_dispatch 로만 도므로 push 로 재실행되지 않는다(루프 없음).
+            git commit -m "chore: daily news signal refresh"
             git push origin HEAD:deploy/streamlit-dashboard
           fi
