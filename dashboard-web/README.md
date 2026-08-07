@@ -1,6 +1,6 @@
 # SentiBoard Web — React 대시보드
 
-Streamlit 버전(`dashboard/app.py`)의 **React(Vite) 포팅**. Lovable과 동일 스택(React SPA)이라
+**Econpilot 사이트**(https://aicp-econpilot.github.io/) 의 소스. React(Vite) SPA — Lovable과 동일 스택이라
 그대로 발전시키거나 Lovable에 이관 가능.
 
 ## 구조 (핵심: 프론트는 계산하지 않는다)

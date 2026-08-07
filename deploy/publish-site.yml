@@ -1,0 +1,71 @@
+# 이 파일을 `aicp-econpilot/aicp-econpilot.github.io` 레포의
+# `.github/workflows/publish.yml` 로 넣으세요. (이 레포에 두면 동작하지 않습니다)
+#
+# 하는 일: 공개 소스 레포에서 사이트를 내려받아 빌드하고, 이 레포의 Pages 로 배포.
+# 토큰·시크릿 불필요 — 자기 레포에 배포할 때 쓰는 GITHUB_TOKEN 만 사용합니다.
+#
+# 사전 설정: 이 레포 Settings → Pages → Source 를 "GitHub Actions" 로 지정.
+
+name: Publish site
+
+on:
+  schedule:
+    # 23:00 UTC = 08:00 KST — 소스 레포의 일일 수집(07:00 KST) 직후라 그날 데이터가 반영된다.
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SRC_REPO: https://github.com/2026-AICP/fomc-sentiment-agents.git
+      # deploy 브랜치에 매일 갱신된 데이터(JSON)가 커밋된다 — main 이 아니라 이쪽을 쓴다.
+      SRC_BRANCH: deploy/streamlit-dashboard
+    steps:
+      - name: Fetch site source (public repo)
+        run: git clone --depth 1 --branch "$SRC_BRANCH" "$SRC_REPO" src
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install & build
+        working-directory: src/dashboard-web
+        run: |
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          npm run build
+
+      - name: Verify build output
+        working-directory: src/dashboard-web
+        run: |
+          test -f dist/index.html || { echo "::error::dist/index.html 없음 — 빌드 실패"; exit 1; }
+          n=$(ls dist/data/*.json 2>/dev/null | wc -l)
+          echo "데이터 JSON ${n}개"
+          [ "$n" -gt 0 ] || { echo "::error::dist/data 에 JSON 없음"; exit 1; }
+          touch dist/.nojekyll
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: src/dashboard-web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
