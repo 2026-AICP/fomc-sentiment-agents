@@ -116,6 +116,20 @@ def export_minutes():
     return out
 
 
+def export_news_headlines(limit=20):
+    """최근 기사 제목·출처·시각·링크 — 홈 화면 뉴스 목록용.
+
+    지수(news_daily)는 집계값이라 제목이 없다. 사이트에 '무슨 기사가 들어왔는지'를
+    보여주려면 원본 CSV의 헤드라인이 필요하다(점수화 대상과 동일한 F∧M 통과분).
+    """
+    rows = [r for r in _csv_rows(ROOT / "data" / "news" / "fed_news.csv")
+            if r.get("published_at") and r.get("title")]
+    rows.sort(key=lambda r: r["published_at"], reverse=True)
+    return [{"title": r["title"], "source": r.get("source", ""),
+             "published_at": r["published_at"], "url": r.get("url", "")}
+            for r in rows[:limit]]
+
+
 def export_axis_status():
     """회의별 3축(성명문·회의록·기자회견) 보유 현황 — 무엇이 아직 안 왔는지."""
     return [{"date": r["date"], "statement": r["statement"] == "1",
@@ -178,6 +192,7 @@ def main():
         "presser.json": export_presser(),
         "minutes.json": export_minutes(),
         "axis_status.json": export_axis_status(),
+        "news_headlines.json": export_news_headlines(),
     }
     counts = {k.replace(".json", ""): len(v) for k, v in files.items()}
     files["meta.json"] = export_meta(con, counts)
