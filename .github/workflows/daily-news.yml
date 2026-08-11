@@ -55,7 +55,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install transformers requests beautifulsoup4 pandas numpy yfinance
+          # langgraph 는 에이전트(agents/graph.py)의 필수 의존성 — 빠지면 ③단계가
+          # ImportError 로 죽고, set -e 때문에 그 뒤 대시보드 갱신까지 통째로 건너뛴다.
+          pip install transformers requests beautifulsoup4 pandas numpy yfinance langgraph
 
       - name: Run daily news pipeline (수집 → 지수 → 당일 신호)
         continue-on-error: true       # 일시적 API/네트워크 실패로 잡 전체가 죽지 않게

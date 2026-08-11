@@ -18,7 +18,10 @@ python3 engine/presser_scrape.py || echo "  warn: 기자회견 수집 실패(건
 python3 agents/news_scheduler.py     # ① 수집 + FinBERT → 일별 News 지수 (+오늘의 감성)
 python3 analysis/daily_index.py      # ② Fed 계단 + 매일 News → 일별 결합(headline)
 TODAY_ET="$(TZ=America/New_York date +%F)"   # ③ 통합 에이전트 — 미국(ET) 오늘 날짜 기준
-python3 - "$TODAY_ET" <<'PY'
+# ③이 실패해도(의존성·네트워크 등) 이미 저장된 수집 결과는 유효하므로 ④는 반드시 실행한다.
+# set -e 아래서 한 단계 실패가 뒤 단계를 통째로 막던 문제 방지
+# (2026-08: langgraph 미설치로 ③이 죽어 대시보드가 4일간 갱신 안 됨).
+python3 - "$TODAY_ET" <<'PY' || echo "  warn: 에이전트 단계 실패 — 대시보드 갱신은 계속 진행"
 import sys
 from agents import graph
 from analysis.axis_status import pending_meetings, write_status
