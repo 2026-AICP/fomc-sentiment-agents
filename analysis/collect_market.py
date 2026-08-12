@@ -217,27 +217,28 @@ def slice_windows(df, dates):
 
 
 def upsert_market(con, df):
-    """market 테이블에 적재. 같은 date면 덮어쓰기(멱등성 보장).
+    """market 테이블에 적재. 같은 date면 갱신하되 **결측이 기존 값을 지우지 않는다**.
 
-    date를 키로 INSERT OR REPLACE -> 몇 번을 돌려도 중복 행이 안 쌓인다.
+    ★INSERT OR REPLACE 를 쓰면 행 전체가 교체돼, 이번 실행에서 못 받은 항목(예: FRED
+    국채금리 조회 실패)이 NULL 로 들어가며 **이미 저장된 정상 값을 덮어쓴다**
+    (2026-08 실제 발생: 7/27 국채 4.31 → NULL). 그래서 컬럼별 COALESCE 로 갱신한다:
+    새 값이 있으면 새 값, 없으면(NULL) 기존 값 유지. date 가 PRIMARY KEY 라 UPSERT 가능.
     """
     cols = ["date", "spx_close", "spx_ret_cc", "vix", "vix_chg", "ust2y", "ust10y"]
+    upd = ", ".join(f"{c}=COALESCE(excluded.{c}, market.{c})" for c in cols[1:])
+    sql = (f"INSERT INTO market ({','.join(cols)}) VALUES ({','.join('?' * len(cols))}) "
+           f"ON CONFLICT(date) DO UPDATE SET {upd}")
     for ts, row in df.iterrows():
         date_str = ts.strftime("%Y-%m-%d") if hasattr(ts, "strftime") else str(ts)
-        values = (
+        con.execute(sql, (
             date_str,
             _num(row["spx_close"]),
             _num(row["spx_ret_cc"]),
             _num(row["vix"]),
             _num(row["vix_chg"]),
-            row["ust2y"],
-            row["ust10y"],
-        )
-        con.execute(
-            f"INSERT OR REPLACE INTO market ({','.join(cols)}) "
-            f"VALUES ({','.join('?' * len(cols))})",
-            values,
-        )
+            _num(row["ust2y"]),
+            _num(row["ust10y"]),
+        ))
     con.commit()
 
 

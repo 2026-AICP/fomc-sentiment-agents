@@ -22,6 +22,9 @@ jobs:
       SENTIMENT_ENGINE: finbert
       FINBERT_MODEL_DIR: models/finbert-finetuned
       NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+      # 국채금리(2Y/10Y) 조회용. 없어도 공개 CSV 로 폴백하지만, 키가 있으면
+      # 레이트리밋에 덜 걸려 결측이 줄어든다(결측이 기존 값을 지우진 않음 — upsert COALESCE).
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
     steps:
       - name: Checkout deploy branch
         uses: actions/checkout@v4
