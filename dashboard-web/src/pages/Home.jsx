@@ -55,14 +55,26 @@ export default function Home() {
   const last = daily[daily.length - 1];
   const rows = alerts.slice(-8).reverse();
 
-  const m = market[market.length - 1], m0 = market[market.length - 2];
-  const diff = (a, b) => (a == null || b == null ? null : Math.round((a - b) * 100) / 100);
+  const m = market[market.length - 1];
+  // 항목마다 가장 최근의 유효값 2개를 찾는다 — 마지막 행만 보면 그날 결측인 항목이 빈칸이 된다.
+  const recent = (key) => {
+    const out = [];
+    for (let i = market.length - 1; i >= 0 && out.length < 2; i--) {
+      if (market[i][key] != null) out.push(market[i][key]);
+    }
+    return out;
+  };
+  const pick = (key, chgKey = null) => {
+    const [v, prev] = recent(key);
+    const c = chgKey ? m[chgKey] : (v != null && prev != null ? Math.round((v - prev) * 100) / 100 : null);
+    return [v ?? null, c ?? null];
+  };
   const indicators = [
-    ["S&P 500", m.spx, m.spx_ret, "지수", "%"],
-    ["VIX 변동성", m.vix, m.vix_chg, "지수", ""],
-    ["미 국채 2년", m.ust2y, diff(m.ust2y, m0.ust2y), "%", "%p"],
-    ["미 국채 10년", m.ust10y, diff(m.ust10y, m0.ust10y), "%", "%p"],
-    ["장단기 스프레드", m.spread, diff(m.spread, m0.spread), "%p", "%p"],
+    ["S&P 500", ...pick("spx", "spx_ret"), "지수", "%"],
+    ["VIX 변동성", ...pick("vix", "vix_chg"), "지수", ""],
+    ["미 국채 2년", ...pick("ust2y"), "%", "%p"],
+    ["미 국채 10년", ...pick("ust10y"), "%", "%p"],
+    ["장단기 스프레드", ...pick("spread"), "%p", "%p"],
   ];
 
   const mf = meta.minutes_finding, am = mf?.axis_means;
@@ -161,7 +173,10 @@ export default function Home() {
               {indicators.map(([n, v, c, u, s]) => (
                 <tr key={n}>
                   <td>{n}</td>
-                  <td className="r"><span className="num">{v?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></td>
+                  <td className="r"><span className="num">
+                    {v == null ? <span className="na">—</span>
+                      : v.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span></td>
                   <td className="r"><N v={c} d={2} suffix={s} /></td>
                   <td className="c u">{u}</td>
                 </tr>

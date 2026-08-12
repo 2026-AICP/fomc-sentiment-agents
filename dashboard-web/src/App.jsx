@@ -28,14 +28,31 @@ const PAGES = [
 function Ticker() {
   const { data: mk } = useJson("market");
   if (!mk || mk.length < 2) return null;
-  const a = mk[mk.length - 1], b = mk[mk.length - 2];
-  const d = (x, y) => (x == null || y == null ? null : Math.round((x - y) * 100) / 100);
+
+  // 항목마다 **가장 최근의 유효값 2개**를 뒤에서부터 찾는다.
+  // 마지막 행만 보면, 그날 못 받은 항목(예: 국채금리 결측)이 빈 값으로 나온다.
+  const recent = (key, n = 2) => {
+    const out = [];
+    for (let i = mk.length - 1; i >= 0 && out.length < n; i--) {
+      if (mk[i][key] != null) out.push(mk[i][key]);
+    }
+    return out;
+  };
+  const last = mk[mk.length - 1];
+  const round2 = (x) => Math.round(x * 100) / 100;
+  // 값·전일비를 함께 만든다. 값이 아예 없으면 null → 화면엔 "—".
+  const field = (key, { fixed = 2, suffix = "", chgKey = null } = {}) => {
+    const [v, prev] = recent(key);
+    const c = chgKey ? last[chgKey] : (v != null && prev != null ? round2(v - prev) : null);
+    return { v: v == null ? null : v.toFixed(fixed) + suffix, c };
+  };
   const items = [
-    { n: "S&P 500", v: a.spx?.toLocaleString(undefined, { minimumFractionDigits: 2 }), c: a.spx_ret, s: "%" },
-    { n: "VIX", v: a.vix?.toFixed(2), c: a.vix_chg, s: "" },
-    { n: "미 국채 2년", v: a.ust2y?.toFixed(2) + "%", c: d(a.ust2y, b.ust2y), s: "%p" },
-    { n: "미 국채 10년", v: a.ust10y?.toFixed(2) + "%", c: d(a.ust10y, b.ust10y), s: "%p" },
-    { n: "장단기 스프레드", v: a.spread?.toFixed(2) + "%p", c: d(a.spread, b.spread), s: "%p" },
+    { n: "S&P 500", ...field("spx", { chgKey: "spx_ret" }), s: "%",
+      v: last.spx?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? null },
+    { n: "VIX", ...field("vix", { chgKey: "vix_chg" }), s: "" },
+    { n: "미 국채 2년", ...field("ust2y", { suffix: "%" }), s: "%p" },
+    { n: "미 국채 10년", ...field("ust10y", { suffix: "%" }), s: "%p" },
+    { n: "장단기 스프레드", ...field("spread", { suffix: "%p" }), s: "%p" },
   ];
   return (
     <div className="ticker">
@@ -43,7 +60,7 @@ function Ticker() {
         {items.map((it) => (
           <div className="tk" key={it.n}>
             <span className="tk-n">{it.n}</span>
-            <span className="tk-v">{it.v}</span>
+            <span className="tk-v">{it.v ?? "—"}</span>
             <span className={`num ${it.c > 0 ? "pos" : it.c < 0 ? "neg" : ""}`}>
               {it.c == null ? "—" : `${fmt(it.c, 2)}${it.s}`}
             </span>
