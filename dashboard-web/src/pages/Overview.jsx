@@ -16,7 +16,7 @@ export default function Overview() {
 
   return (
     <>
-      <h1>오늘의 시장 감성 👋</h1>
+      <h1>오늘의 시장 감성</h1>
       <p className="sub">FOMC 성명문(Fed 축) + 경제뉴스(News 축) 실시간 감성·신호 — 예측이 아닌 경향</p>
 
       <div className="kpis">
