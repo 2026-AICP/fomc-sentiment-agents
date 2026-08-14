@@ -80,8 +80,8 @@ export default function App() {
     <>
       <div className="util">
         <div className="wrap">
-          <span>FOMC 성명문 · 회의록 · 기자회견 감성 분석</span>
-          <span>데이터 자동 갱신 07:00 KST{updated ? ` · 최근 ${updated}` : ""}</span>
+          <span>연준 문서와 경제뉴스의 감성 분석</span>
+          <span>매일 오전 7시 업데이트{updated ? ` · 최근 ${updated}` : ""}</span>
           <span className="right">2026-AICP · Econpilot</span>
         </div>
       </div>
@@ -109,9 +109,9 @@ export default function App() {
       <footer className="site-foot">
         <div className="wrap">
           <span>2026-AICP · Econpilot</span>
-          <span>데이터: 연방준비제도 공개문서 · 시장 공개데이터</span>
-          <span>규칙 기반 · LLM 미사용 · 재현 가능</span>
-          <span>참고용 · 투자조언 아님</span>
+          <span>자료: 연방준비제도 공개 문서, 시장 공개 데이터</span>
+          <span>모든 수치는 고정된 규칙으로 계산되며 전 과정을 재현할 수 있습니다.</span>
+          <span>본 사이트의 지수와 신호는 공개 문서를 분석한 참고 정보이며, 투자 자문이 아닙니다.</span>
         </div>
       </footer>
     </>

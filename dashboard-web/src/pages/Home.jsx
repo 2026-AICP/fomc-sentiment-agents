@@ -1,4 +1,4 @@
-import { useJson, fmt } from "../lib/data";
+import { useJson, fmt, toneLabel } from "../lib/data";
 
 /** 부호에 따라 색을 주는 숫자. 값이 없으면 '대기'(아직 안 온 축) 또는 '—'. */
 function N({ v, d = 3, suffix = "", pending = false }) {
@@ -78,31 +78,47 @@ export default function Home() {
   ];
 
   const mf = meta.minutes_finding, am = mf?.axis_means;
+  const lastLabel = toneLabel(last.index);
 
   return (
-    <div className="cols">
+    <>
+      <h1>FOMC 감성지수</h1>
+      <p className="sub">
+        미국 연방준비제도(연준)의 성명문·회의록·기자회견과 경제뉴스를 같은 기준으로 분석해,
+        연준의 어조가 낙관에 가까운지 우려에 가까운지 지수로 보여줍니다.
+        지수는 −1(비관)부터 +1(낙관) 사이의 값이며, 대체로 −0.3에서 +0.4 사이에서 움직입니다.
+      </p>
+
+      <div className="cols">
       <div>
         <div className="card">
-          <h2>Fed·뉴스 통합 감성지수
-            <span className="more"><a href="#">지수 상세 ›</a></span></h2>
+          <h2>통합 감성지수</h2>
           <div className="pad hero">
             <div>
               <div className="lbl">최근값 · {last.date}</div>
-              <div className={`big ${last.index > 0 ? "pos" : last.index < 0 ? "neg" : ""}`}>
+              <div className={`big ${last.index > 0 ? "pos" : last.index < 0 ? "neg" : ""}`}
+                style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 {fmt(last.index)}
+                {lastLabel && (
+                  <span className="pill" style={{
+                    color: lastLabel.color, fontSize: 13,
+                    border: `1px solid color-mix(in srgb, ${lastLabel.color} 30%, transparent)`,
+                    background: `color-mix(in srgb, ${lastLabel.color} 9%, transparent)`,
+                  }}>{lastLabel.text}</span>
+                )}
               </div>
-              <div className="sub2">기사 {last.n_articles}건 · 확신도 가중 · 최근 {series.length}일 추이</div>
+              <div className="sub2">이날 기사 {last.n_articles}건 기준 · 최근 {series.length}일 흐름</div>
             </div>
             <Spark values={series} />
           </div>
           <div className="note">
-            지수는 공개 문서·기사의 <b>톤</b>을 수치화한 것입니다. 시장 예측이 아닙니다.
+            지수는 공개된 문서와 기사의 어조를 수치화한 것입니다. 시장 전망이나 투자 판단의
+            근거가 아닙니다.
           </div>
         </div>
 
         <div className="card">
-          <h2>FOMC 회의 일정 · 감성
-            <span className="more"><a href="#">전체 캘린더 ›</a></span></h2>
+          <h2>FOMC 회의별 감성</h2>
           <div className="scroll">
             <table className="data">
               <thead>
@@ -137,13 +153,16 @@ export default function Home() {
             </table>
           </div>
           <div className="note">
-            회의록은 회의 <b>3주 후</b>, 기자회견 원문은 며칠 후 공개됩니다 — 도착하는 대로 자동으로 채워집니다.
+            한 회의에서 성명문·회의록·기자회견 세 자료가 모두 공개되면 수집 항목이 3/3이 됩니다.
+            회의록은 회의 약 3주 뒤, 기자회견 원문은 며칠 뒤에 공개되며, 그때까지는 대기로
+            표시됩니다. 신호는 매수·매도 권고가 아니라 연준의 어조와 시장 반응이 어긋난 날을
+            표시합니다.
           </div>
         </div>
 
         {news?.length > 0 && (
           <div className="card">
-            <h2>Fed 관련 주요 뉴스<span className="more"><a href="#">더 보기 ›</a></span></h2>
+            <h2>연준 관련 주요 뉴스</h2>
             <ul className="news">
               {news.slice(0, 8).map((n) => (
                 <li key={n.url || n.title}>
@@ -156,7 +175,7 @@ export default function Home() {
               ))}
             </ul>
             <div className="note">
-              연준·통화정책 키워드(F그룹 AND M그룹)를 만족한 기사만 지수에 반영됩니다.
+              연준과 통화정책에 직접 관련된 기사만 골라 지수에 반영합니다.
             </div>
           </div>
         )}
@@ -192,16 +211,17 @@ export default function Home() {
             <table className="data">
               <thead><tr><th>문서</th><th className="r">평균</th><th>성격</th></tr></thead>
               <tbody>
-                {[["성명문", am.statement, "대외 공식"],
-                  ["회의록", am.minutes, "내부 논의"],
-                  ["기자회견", am.presser, "라이브 Q&A"]].map(([n, v, d]) => (
+                {[["성명문", am.statement, "공식 발표문"],
+                  ["회의록", am.minutes, "내부 논의 기록"],
+                  ["기자회견", am.presser, "즉석 질의응답"]].map(([n, v, d]) => (
                   <tr key={n}><td>{n}</td><td className="r"><N v={v} /></td><td className="u">{d}</td></tr>
                 ))}
               </tbody>
             </table>
             <div className="note">
-              공식 문서일수록 낙관적 — 회의록이 성명문보다 신중한 비율{" "}
-              <b>{Math.round(mf.pct_more_cautious * 100)}%</b> (n={mf.n_meetings}, p={mf.p_sign_test.toExponential(0)})
+              공식 발표문일수록 어조가 낙관적입니다. 전체 {mf.n_meetings}회 중{" "}
+              {Math.round(mf.pct_more_cautious * mf.n_meetings)}회에서 회의록이 성명문보다
+              신중했습니다.
             </div>
           </div>
         )}
@@ -209,12 +229,13 @@ export default function Home() {
         <div className="card">
           <h2>이 사이트는</h2>
           <div className="pad" style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.7 }}>
-            FOMC <b>성명문·회의록·기자회견</b>과 경제뉴스를 같은 방식으로 점수화해 공개합니다.
-            <br /><br />
-            규칙 기반 · LLM 미사용 · 전 과정 재현 가능.
+            Econpilot은 연준의 공개 문서와 경제뉴스를 자동으로 수집해 같은 기준으로 채점하고,
+            매일 아침 지수를 갱신합니다. 모든 수치는 고정된 규칙으로 계산되며 전 과정을
+            재현할 수 있습니다.
           </div>
         </div>
       </aside>
-    </div>
+      </div>
+    </>
   );
 }

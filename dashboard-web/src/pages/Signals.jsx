@@ -1,45 +1,52 @@
-import { useJson, fmt, GRADE_COLOR } from "../lib/data";
+import { useJson, fmt, gradeInfo, firedNames, stripEmoji } from "../lib/data";
 import { Pill } from "../components/ui";
 
-// 신호 정의 — analysis/signals.py 의 규칙을 사람 말로 (θ는 데이터 기반 보정, signal_calibration.md)
+// 네 가지 판정 규칙 — 내부 코드명 대신 화면용 이름으로 설명한다.
 const SIGNAL_DEFS = [
   {
-    code: "A", name: "tone_shift · 톤 급변", color: "var(--warn)",
-    what: "직전 회의 대비 톤이 크게 변함",
-    why: "연준 스탠스가 바뀌는 순간 — 시장이 다시 읽어야 할 때",
+    code: "A", name: "톤 급변", color: "var(--warn)",
+    what: "직전 회의보다 어조가 크게 달라졌습니다.",
+    why: "연준의 기조가 바뀌는 시점으로, 시장이 발표문을 다시 읽는 순간입니다.",
   },
   {
-    code: "B", name: "divergence · 괴리 ⭐", color: "var(--bad)",
-    what: "톤과 당일 시장(S&P) 방향이 서로 반대 (둘 다 충분히 클 때)",
-    why: "연준 인식 ≠ 시장 인식 — 위기 예측이 아니라 추가 검토가 필요한 attention signal (위기 구간과 2.4× 연관)",
+    code: "B", name: "톤·시장 엇갈림", color: "var(--crit)",
+    what: "연준의 어조와 발표 당일 주가의 방향이 서로 반대입니다. 둘 다 충분히 클 때만 발동합니다.",
+    why: "과거 위기 구간에서 평소보다 2.4배 자주 나타났습니다. 위기를 예측하는 것은 아니며, 자세히 살펴볼 필요가 있다는 표시입니다.",
   },
   {
-    code: "C", name: "tone_vs_vix · 톤-공포 이례", color: "var(--blue)",
-    what: "평소의 음(−)의 동행(톤↑→VIX↓)이 깨짐",
-    why: "말과 공포가 같이 오르는 이례적 순간",
+    code: "C", name: "톤·변동성 이례", color: "var(--blue)",
+    what: "어조가 좋아졌는데도 변동성지수(VIX)가 함께 오르는 등, 평소의 반대 방향 관계가 깨졌습니다.",
+    why: "발표문과 시장 심리가 따로 움직이는 드문 경우입니다.",
   },
   {
-    code: "D", name: "tone_vs_rate · 톤-금리 이탈", color: "var(--accent)",
-    what: "톤과 2년물 금리 변화의 동행이 깨짐",
-    why: "2년물은 정책 기대에 민감 — 시장의 정책 해석이 연준 톤과 어긋남",
+    code: "D", name: "톤·금리 이탈", color: "var(--accent)",
+    what: "어조와 2년 만기 국채금리의 움직임이 평소의 관계에서 벗어났습니다.",
+    why: "2년물 금리는 정책 기대를 민감하게 반영하므로, 시장의 해석이 발표문과 어긋났다는 뜻입니다.",
   },
 ];
 
 const GRADES = [
-  { g: "🔴 경고", d: "강한 괴리 — 톤·시장 모두 크게 어긋남" },
-  { g: "⚠️ 주의", d: "신호 1개 이상 발동 — 들여다볼 것" },
-  { g: "🟢 정합", d: "톤과 시장이 같은 방향 — 특이 없음" },
-  { g: "⚪ 중립", d: "신호 판단에 충분한 크기 아님" },
+  { label: "경고", color: "var(--crit)",
+    d: "어조와 시장 반응이 크게 어긋났습니다. 그날 어떤 일이 있었는지 확인해볼 만합니다." },
+  { label: "주의", color: "var(--warn)",
+    d: "규칙 중 하나 이상이 발동했습니다. 가볍게 살펴보시기 바랍니다." },
+  { label: "정합", color: "var(--up)",
+    d: "어조와 시장이 같은 방향으로 움직였습니다." },
+  { label: "중립", color: "var(--muted)",
+    d: "판단할 만큼 변화가 크지 않았습니다." },
 ];
 
 export default function Signals() {
   const { data: alerts } = useJson("alerts");
-  if (!alerts) return <div className="loading">데이터 로딩…</div>;
+  if (!alerts) return <div className="loading">데이터를 불러오는 중입니다.</div>;
 
   return (
     <>
       <h1>신호</h1>
-      <p className="sub">검증된 analysis.signals 엔진 — <b>예측이 아닌 알림</b> ("사라/팔아라"가 아니라 "정합/괴리" 표시)</p>
+      <p className="sub">
+        회의마다 연준의 어조와 시장 반응을 미리 정한 네 가지 규칙으로 비교합니다.
+        매수·매도 권고가 아니라, 살펴볼 만한 날을 표시하는 알림입니다.
+      </p>
 
       <h2 className="sec" style={{ marginTop: 8 }}>네 가지 규칙</h2>
       <div className="cards2">
@@ -55,29 +62,36 @@ export default function Signals() {
         ))}
       </div>
       <div className="note">
-        임계값(θ)은 자의가 아니라 <b>실제 분포(분위수) 기반으로 보정</b> — <span className="num">docs/signal_calibration.md</span> · 결과 최적화 아님(과최적 회피)
+        발동 기준선은 임의로 정하지 않고, 과거 자료의 분포에서 상위 구간에 해당하는 값으로
+        정했습니다.
       </div>
 
-      <h2 className="sec">등급 읽는 법</h2>
+      <h2 className="sec">등급은 어떻게 읽나요?</h2>
       <div className="kpis">
         {GRADES.map((x) => (
-          <div className="kpi" key={x.g}>
-            <div className="big" style={{ fontSize: 20 }}>{x.g}</div>
+          <div className="kpi" key={x.label}>
+            <div className="big" style={{ fontSize: 20, color: x.color }}>{x.label}</div>
             <div className="mt">{x.d}</div>
           </div>
         ))}
       </div>
 
-      <h2 className="sec">회의별 신호 (전체 {alerts.length}건, 최신순)</h2>
-      {alerts.slice().reverse().map((a) => (
-        <div className="alert-row" key={a.date}>
-          <div>
-            <div className="d1">{a.date} — {a.detail || "특이신호 없음"}</div>
-            <div className="d2">톤 {fmt(a.tone)} · 시장반응 {fmt(a.reaction, 2)}% · 발동 [{a.fired.join(", ") || "—"}]</div>
+      <h2 className="sec">회의별 기록 (전체 {alerts.length}건, 최신순)</h2>
+      {alerts.slice().reverse().map((a) => {
+        const gi = gradeInfo(a.grade);
+        return (
+          <div className="alert-row" key={a.date}>
+            <div>
+              <div className="d1">{a.date} · {stripEmoji(a.detail) || "특이 사항 없음"}</div>
+              <div className="d2">
+                톤 {fmt(a.tone)} · 시장 반응 {a.reaction == null ? "—" : `${fmt(a.reaction, 2)}%`} ·{" "}
+                {a.fired.length ? `발동 규칙: ${firedNames(a.fired)}` : "발동한 규칙 없음"}
+              </div>
+            </div>
+            <Pill color={gi.color}>{gi.label}</Pill>
           </div>
-          <Pill color={GRADE_COLOR[a.grade]}>{a.grade}</Pill>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }
