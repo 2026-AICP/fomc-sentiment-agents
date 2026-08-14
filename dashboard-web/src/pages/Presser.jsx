@@ -5,25 +5,29 @@ import { SimpleLine } from "../components/charts";
 export default function Presser() {
   const { data: presser } = useJson("presser");
   const { data: meta } = useJson("meta");
-  if (!presser || !meta) return <div className="loading">데이터 로딩…</div>;
+  if (!presser || !meta) return <div className="loading">데이터를 불러오는 중입니다.</div>;
   const pf = meta.presser_finding;
 
   return (
     <>
-      <h1>기자회견 vs 성명문</h1>
-      <p className="sub">다듬어진 성명문과 라이브 Q&A(의장 발언만)의 톤 비교 — 2011~2026, 4의장 ({pf.n_meetings}회의)</p>
+      <h1>기자회견</h1>
+      <p className="sub">
+        정제된 성명문과 의장의 즉석 질의응답의 어조를 비교합니다. 기자회견은 2011년에
+        도입되어 지금까지 {pf.n_meetings}회 열렸습니다.
+      </p>
 
       <div className="kpis">
-        <Kpi eyebrow="기자회견이 더 신중"
+        <Kpi eyebrow="기자회견이 성명문보다 신중"
           value={<span style={{ color: "var(--accent)" }}>{Math.round(pf.pct_more_cautious * 100)}%</span>}
-          meta={`${pf.n_meetings}회의 중 · 부호검정 p=${pf.p_sign_test.toExponential(1)}`} />
-        <Kpi eyebrow="평균 괴리 (기자회견 − 성명문)" value={fmt(pf.mean_gap)}
-          meta="일관되게 음수 = Q&A가 방어적" />
-        <Kpi eyebrow="가장 큰 후퇴" value="−0.501" meta="2018-09-26 (긴축기) · Warsh 첫 회의 −0.431" />
+          meta={`전체 ${pf.n_meetings}회 중 ${Math.round(pf.pct_more_cautious * pf.n_meetings)}회`} />
+        <Kpi eyebrow="평균 차이 (기자회견 − 성명문)" value={fmt(pf.mean_gap)}
+          meta="음수는 질의응답이 더 신중하다는 뜻입니다" />
+        <Kpi eyebrow="차이가 가장 컸던 회의" value="−0.501"
+          meta="2018년 9월 26일, 금리 인상기" />
       </div>
 
-      <h2 className="sec">회의별 톤 — 성명문 vs 기자회견</h2>
-      <Panel cap="주황 = 성명문, 파랑 = 기자회견(의장 발언만, FinBERT 동일 방법). 기자회견이 거의 항상 아래.">
+      <h2 className="sec">회의별 톤 비교</h2>
+      <Panel cap="주황 선은 성명문, 파랑 선은 기자회견입니다. 같은 회의라도 즉석 답변이 거의 항상 더 신중합니다.">
         <SimpleLine data={presser} height={280}
           series={[
             { key: "statement", name: "성명문", color: "var(--accent)" },
@@ -31,7 +35,11 @@ export default function Presser() {
           ]} />
       </Panel>
 
-      <div className="note"><b>해석</b> — {pf.note}. 괴리가 평소(≈−0.11)보다 크게 벌어지면 "성명과 실제 스탠스 사이 긴장"의 주목 신호 (예측 아님).</div>
+      <div className="note">
+        준비된 발표문일수록 어조가 낙관적이고, 즉석 답변일수록 신중해지는 경향이
+        일관되게 나타납니다. 두 어조의 차이가 평소보다 크게 벌어진 회의는 발표문과 실제
+        스탠스가 달랐을 가능성이 있어 살펴볼 만합니다.
+      </div>
     </>
   );
 }
