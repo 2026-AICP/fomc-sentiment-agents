@@ -86,6 +86,7 @@ def export_daily_signals():
              "fed_axes": [x for x in (r.get("fed_axes") or "").split(";") if x],
              "grade_final": r.get("grade_final") or None,
              "index_final": _f(r.get("index_final")),
+             "fed_axes_final": [x for x in (r.get("fed_axes_final") or "").split(";") if x],
              "finalized_at": r.get("finalized_at") or None}
             for r in _csv_rows(ROOT / "outputs" / "daily_signals.csv")]
 

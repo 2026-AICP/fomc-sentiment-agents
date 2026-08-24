@@ -41,5 +41,7 @@ def test_finalization_adds_final_fields_without_touching_realtime(tmp_path, monk
     row = {r["date"]: r for r in csv.DictReader(open(out, encoding="utf-8"))}["2026-08-05"]
     assert row["grade"] == "⚠️ 주의" and float(row["index"]) == -0.12         # 속보치 불변
     assert row["grade_final"] == "🟢 정합" and float(row["index_final"]) == -0.30
-    assert row["fed_axes"] == "statement;presser;minutes"
+    # fed_axes(속보치 근거)는 grade/index 와 함께 얼려두고, 확정판 축 구성은 별도 컬럼에.
+    assert row["fed_axes"] == "statement"
+    assert row["fed_axes_final"] == "statement;presser;minutes"
     assert row["finalized_at"]

@@ -5,6 +5,7 @@
 fed_composite_asof) — DB 계층에서 확정판 도착 후에도 속보치 행이 그대로인지 확인한다.
 """
 import db
+from agents import graph
 from analysis.headline import combine_fed_axes
 from analysis.analyze_alignment import upsert_fed_composite, fed_composite_asof
 
@@ -84,6 +85,28 @@ def test_asof_carries_forward_latest_meeting_before_date():
     upsert_fed_composite(conn, "2026-08-05", -0.10, 1, 3, final=False)
     assert fed_composite_asof(conn, "2026-07-15") == 0.20    # 7/1 회의 이월
     assert fed_composite_asof(conn, "2026-08-06") == -0.10   # 8/5 회의 이월
+
+
+def test_pre2019_meeting_without_presser_still_finalizes_on_minutes(monkeypatch, tmp_path):
+    """2011-04~2018 회의는 분기(SEP) 회의에만 기자회견이 있었다(2019년부터 매 회의).
+    axis_status.expected_axes()는 이 구간 모든 회의에 presser 를 기대하지만 실제로는
+    아니므로, "3축 다 참"을 확정 기준으로 삼으면 presser 없는 회의는 minutes 가 와도
+    영원히 확정되지 않는다. 확정 기준은 minutes 포함 여부여야 한다(news_node)."""
+    monkeypatch.setattr(graph, "DB", tmp_path / "fomc.db")
+    monkeypatch.setattr(graph, "index_for_window", lambda **kw: None)
+    monkeypatch.setattr(graph, "index_pre_post",
+                        lambda **kw: {"cutoff": None, "pre": None, "post": None, "shift": None})
+    monkeypatch.setattr(graph, "has_presser", lambda d: False)   # 이 구간엔 정상적으로 없음
+    monkeypatch.setattr(graph, "has_minutes", lambda d: True)
+    monkeypatch.setattr(graph, "minutes_tone", lambda date, analyze=None: {
+        "conf_weighted": 0.05, "n_sentences": 100, "sections": {}})
+
+    st = graph._init_state("2013-06-19")             # 2011-04~2018 구간, presser 없는 회의
+    st["statement_path"] = "/x/FOMC_2013-06-19.txt"
+    st["index"] = {"conf_weighted": 0.10}
+    out = graph.news_node(st)
+    assert out["fed_axes"] == ["statement", "minutes"]
+    assert out["fed_final"] is True                  # presser 영구 부재와 무관하게 확정
 
 
 def test_asof_falls_back_to_legacy_statement_only():

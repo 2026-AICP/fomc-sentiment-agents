@@ -197,7 +197,12 @@ def news_node(state: State) -> State:
             state["index"]["fed_composite"] = round(fc["fed_composite"], 4)
             state["fed_axes"] = fc["axes"]
             expected = len(expected_axes(date))
-            state["fed_final"] = fc["n_axes"] >= expected
+            # 확정 기준은 "minutes 포함 여부"다 — expected_axes()는 2011-04~2018 회의도
+            # presser 를 기대하지만 실제로는 분기(SEP) 회의에만 있었다(has_presser 는 그
+            # 경우 영원히 False). n_axes>=expected 로 판정하면 그런 회의는 minutes 가
+            # 와도 영원히 확정되지 않는다 — minutes 는 유일하게 3주 지연되는 축이라
+            # 도착 시점이 곧 "더 늦게 올 축이 없다"는 뜻이므로 이것만으로 충분하다.
+            state["fed_final"] = "minutes" in fc["axes"]
             conn = db.connect(DB); db.init_db(conn)
             upsert_fed_composite(conn, date, fc["fed_composite"], fc["n_axes"], expected,
                                  state["fed_final"])
@@ -311,17 +316,19 @@ def strategy_node(state: State) -> State:
 
 # ── ⑤ Reporting ──
 DAILY_FIELDS = ["date", "grade", "index", "fired", "gate_reason", "n_articles", "ci_lo", "ci_hi",
-                "fed_axes", "grade_final", "index_final", "finalized_at"]
+                "fed_axes", "grade_final", "index_final", "fed_axes_final", "finalized_at"]
 
 
 def append_daily_signal(rec: dict, out=None):
     """일별 신호 1행 누적. 최신일이 마지막 행 → 대시보드·기록용.
 
     원칙(질문 6 피드백): "과거 실시간 값을 덮어쓰면 안 된다." 그 날짜로 처음 기록되는
-    grade/index(및 게이트·표본 정보)는 "속보치"로 영구 고정한다. 같은 날짜를 재방문해도
-    (예: minutes 도착 후 재처리) 이 필드들은 절대 수정하지 않는다 — rec에 is_final=True가
-    실리면 grade_final/index_final 에만 그 시점 값을 추가로 기록한다(절충안: 속보치·확정판
-    이원화).
+    grade/index/fed_axes(및 게이트·표본 정보)는 "속보치"로 영구 고정한다. 같은 날짜를
+    재방문해도(예: minutes 도착 후 재처리) 이 필드들은 절대 수정하지 않는다 — rec에
+    is_final=True가 실리면 grade_final/index_final/fed_axes_final 에만 그 시점 값을
+    추가로 기록한다(절충안: 속보치·확정판 이원화). fed_axes 를 확정판 값으로 덮어쓰면
+    "이 grade/index 는 몇 개 축으로 계산됐나"라는 속보치 자체의 근거가 사라지므로,
+    fed_axes 도 grade/index 와 함께 얼려두고 fed_axes_final 을 따로 둔다.
     """
     import csv
     out = Path(out or DAILY_SIGNALS)
@@ -341,14 +348,14 @@ def append_daily_signal(rec: dict, out=None):
               "ci_lo": rec.get("ci_lo") if rec.get("ci_lo") is not None else "",
               "ci_hi": rec.get("ci_hi") if rec.get("ci_hi") is not None else "",
               "fed_axes": ";".join(rec.get("fed_axes") or []),
-              "grade_final": "", "index_final": "", "finalized_at": ""}
+              "grade_final": "", "index_final": "", "fed_axes_final": "", "finalized_at": ""}
     else:
         row = {k: existing.get(k, "") for k in DAILY_FIELDS}   # 속보치 필드 보존(옛 스키마 보정)
 
     if rec.get("is_final"):
         row["grade_final"] = rec["grade"]
         row["index_final"] = round(rec.get("index") or 0.0, 4)
-        row["fed_axes"] = ";".join(rec.get("fed_axes") or []) or row.get("fed_axes", "")
+        row["fed_axes_final"] = ";".join(rec.get("fed_axes") or []) or row.get("fed_axes_final", "")
         row["finalized_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     rows[rec["date"]] = row
