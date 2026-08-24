@@ -27,7 +27,13 @@ export default function Overview() {
       <div className="kpis">
         <Kpi eyebrow="통합 감성지수"
           value={<span style={{ color: "var(--accent)" }}>{fmt(lastDaily?.index)}</span>}
-          meta={lastDaily ? `${lastDaily.date} · 연준 문서와 뉴스 결합` : "산출 전"} />
+          meta={lastDaily
+            ? `${lastDaily.date} · 연준 문서와 뉴스 결합`
+              + (lastDaily.gate_reason ? ` · ${lastDaily.gate_reason}` : "")
+              + (lastDaily.grade_final
+                  ? ` · 회의록 반영 확정판 ${fmt(lastDaily.index_final)} (${lastDaily.finalized_at?.slice(0, 10)})`
+                  : "")
+            : "산출 전"} />
         <Kpi eyebrow="연준 성명문" value={fmt(lastMeet.tone)}
           meta={`${lastMeet.date} 회의`} />
         <Kpi eyebrow="경제뉴스" value={fmt(lastNews?.index)}
