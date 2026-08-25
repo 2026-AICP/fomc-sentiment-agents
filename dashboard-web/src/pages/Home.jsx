@@ -1,4 +1,4 @@
-import { useJson, fmt, toneLabel } from "../lib/data";
+import { useJson, fmt, toneLabel, confidenceLevel } from "../lib/data";
 
 /** 부호에 따라 색을 주는 숫자. 값이 없으면 '대기'(아직 안 온 축) 또는 '—'. */
 function N({ v, d = 3, suffix = "", pending = false }) {
@@ -79,6 +79,7 @@ export default function Home() {
 
   const mf = meta.minutes_finding, am = mf?.axis_means;
   const lastLabel = toneLabel(last.index);
+  const conf = confidenceLevel(last.n_articles, last.ci_lo, last.ci_hi);
 
   return (
     <>
@@ -107,13 +108,21 @@ export default function Home() {
                   }}>{lastLabel.text}</span>
                 )}
               </div>
-              <div className="sub2">이날 기사 {last.n_articles}건 기준 · 최근 {series.length}일 흐름</div>
+              <div className="sub2" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span>신뢰도</span>
+                <b style={{ color: conf.color }}>{conf.label}</b>
+                <span style={{ opacity: 0.7 }}>· {conf.why}</span>
+              </div>
+              <div className="sub2">최근 {series.length}일 흐름</div>
             </div>
             <Spark values={series} />
           </div>
           <div className="note">
             지수는 공개된 문서와 기사의 어조를 수치화한 것입니다. 시장 전망이나 투자 판단의
-            근거가 아닙니다.
+            근거가 아닙니다.{" "}
+            {conf.label === "낮음" && (
+              <b>수집된 기사가 적은 날은 지수가 크게 흔들릴 수 있어 신호를 내지 않습니다.</b>
+            )}
           </div>
         </div>
 
