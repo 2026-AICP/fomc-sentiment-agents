@@ -306,10 +306,24 @@ def reporting_node(state: State) -> State:
     except Exception as e:
         state["log"].append(f"[reporting] 톤 CSV 갱신 생략: {str(e)[:35]}")
     state["report_path"] = str(path)
-    append_daily_signal({"date": state["date"],
-                         "grade": state["signals"].get("grade", "—"),
-                         "index": (state.get("headline") or {}).get("headline"),  # 결합(뉴스포함)
-                         "fired": state["signals"].get("fired", [])})
+    grade = state["signals"].get("grade", "—")
+    combined = (state.get("headline") or {}).get("headline")   # 결합(뉴스포함)
+    fired = state["signals"].get("fired", [])
+    append_daily_signal({"date": state["date"], "grade": grade,
+                         "index": combined, "fired": fired})
+    # ★시점 기록 — 위 CSV들은 같은 날짜를 덮어쓰지만, 이 로그는 덧붙이기만 한다.
+    # 자료가 시차를 두고 도착하므로(회의록 3주 후), "그날 알던 값"을 남겨두지 않으면
+    # 나중 정보가 과거 기록에 섞여 설명력·예측력 분석이 실제보다 좋아 보인다.
+    try:
+        from analysis.vintage import record_meeting
+        st = (state.get("index") or {}).get("conf_weighted")
+        mn = (state.get("minutes") or {}).get("tone")
+        pr = (state.get("presser") or {}).get("tone")
+        record_meeting(state["date"], statement=st, minutes=mn, presser=pr,
+                       combined=combined, grade=grade, fired=fired,
+                       n_axes=sum(v is not None for v in (st, mn, pr)))
+    except Exception as e:
+        state["log"].append(f"[reporting] 시점 기록 생략: {str(e)[:35]}")
     state["log"].append(f"[reporting] {path.name} + daily_signals.csv")
     return state
 

@@ -74,6 +74,7 @@ jobs:
           # 파일마다 따로 add 해 존재하는 것만 확실히 스테이지한다(수집분 유실 방지).
           for p in outputs/news_index_live.csv outputs/daily_headline.csv outputs/daily_signals.csv data/news/fed_news.csv data/statements data/minutes data/pressers \
                    outputs/axis_status.csv outputs/minutes_tones.csv outputs/presser_tones.csv \
+                   outputs/vintage_meetings.csv \
                    dashboard-web/public/data; do
             git add -f "$p" 2>/dev/null || true
           done
