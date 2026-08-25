@@ -184,7 +184,17 @@ def collect(days_back=3, pages=5, out=OUT):
         for a in new:
             w.writerow([a["date"], a["title"], a["description"], a["source"],
                         a["url"], a["published_at"]])
-    _log_rejected(raw, articles)
+    n_rej = _log_rejected(raw, articles)
+    # 수집 진단 — 기사가 어느 단계에서 줄어드는지 로그에 남긴다.
+    # 2026-08 에 일별 기사가 급감했을 때 "필터가 문제냐 / 수집량이 문제냐 / API 실패냐"를
+    # 구분할 수치가 없어 커밋 diff 를 역추적해야 했다. 네 숫자면 다음엔 로그만 보면 된다.
+    #   API 매칭(found) ≫ 받음(raw) 이면 → pages 를 못 채운 것(상한·조기중단)
+    #   받음 ≫ 통과      이면 → F∧M 필터가 좁은 것
+    #   통과 ≫ 신규      이면 → 이미 가진 기사(중복) — 창이 겹쳐 새 기사가 적은 것
+    rate = f"{len(articles) / len(raw):.0%}" if raw else "-"
+    print(f"  [수집 진단] API 매칭 {found if found is not None else '?'}건 → 받음 {len(raw)}건 "
+          f"→ F∧M 통과 {len(articles)}건({rate}, 탈락기록 {n_rej}건) "
+          f"→ 신규 저장 {len(new)}건(중복 {len(articles) - len(new)}건)")
     return articles, new, found
 
 
