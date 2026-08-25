@@ -65,6 +65,25 @@ def _z(v: float, stats: Optional[Stats]) -> float:
     return (v - stats[0]) / stats[1]
 
 
+def combine_fed_axes(statement: Optional[float], presser: Optional[float] = None,
+                     minutes: Optional[float] = None) -> Optional[dict]:
+    """Fed 축 내부 결합 — statement:presser:minutes = 1:1:1, z-표준화 후 균등(docs/fed_weights.md).
+
+    회의 당일엔 statement(+presser, 같은 날 있으면)만 가용하고 minutes 는 3주 후 도착한다
+    (질문 6 피드백). 가용한 성분끼리만 z 평균 내어 결합 — combine()의 "뉴스 없으면 Fed
+    단독" 폴백과 같은 철학(성분이 늘어도 코드 변경 없이 재정규화).
+    반환: {fed_composite, axes(사용된 성분 이름), n_axes} 또는 None(전부 없음).
+    """
+    parts = [("statement", statement, "fed"), ("presser", presser, "presser"),
+             ("minutes", minutes, "minutes")]
+    have = [(name, v, key) for name, v, key in parts if v is not None]
+    if not have:
+        return None
+    zs = [_z(v, _axis_stats(key)) for _, v, key in have]
+    return {"fed_composite": sum(zs) / len(zs),
+            "axes": [name for name, _, _ in have], "n_axes": len(have)}
+
+
 def combine(fed: Optional[float], news: Optional[float], w_fed: float = 0.5,
             fed_stats: Optional[Stats] = None,
             news_stats: Optional[Stats] = None) -> Optional[dict]:

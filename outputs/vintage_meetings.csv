@@ -232,3 +232,4 @@ as_of,date,statement,minutes,presser,combined,grade,fired,n_axes
 2026-08-24,2026-08-24,,,,1.3515,⚠️ 주의,tone_shift,0
 2026-08-25,2026-06-17,0.4909,0.2085,0.0598274,2.07338,🔴 경고,tone_shift;divergence;tone_vs_vix;tone_vs_rate,3
 2026-08-25,2026-02-10,0.2,,,0.309278,⚪ 중립,,1
+2026-08-25,2026-02-10,,,,0.3093,⚪ 중립,,0

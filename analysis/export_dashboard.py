@@ -72,8 +72,22 @@ def export_news_daily():
 
 
 def export_daily_signals():
+    """일별 통합 신호 — grade/index 는 속보치(최초 기록 후 불변, 질문6 피드백).
+
+    gate_reason 이 있으면 표본 부족·CI 넓음으로 경보가 관망으로 내려간 것(질문5 피드백,
+    지수 자체는 그대로 표시). grade_final/index_final 은 minutes 도착 후 3축이 다 찼을 때
+    딱 한 번 채워지는 확정판 — 비어 있으면 아직 미확정.
+    """
     return [{"date": r["date"], "grade": r["grade"], "index": _f(r["index"]),
-             "fired": [x for x in (r.get("fired") or "").split(";") if x]}
+             "fired": [x for x in (r.get("fired") or "").split(";") if x],
+             "gate_reason": r.get("gate_reason") or None,
+             "n_articles": int(r["n_articles"]) if r.get("n_articles") else None,
+             "ci_lo": _f(r.get("ci_lo")), "ci_hi": _f(r.get("ci_hi")),
+             "fed_axes": [x for x in (r.get("fed_axes") or "").split(";") if x],
+             "grade_final": r.get("grade_final") or None,
+             "index_final": _f(r.get("index_final")),
+             "fed_axes_final": [x for x in (r.get("fed_axes_final") or "").split(";") if x],
+             "finalized_at": r.get("finalized_at") or None}
             for r in _csv_rows(ROOT / "outputs" / "daily_signals.csv")]
 
 
