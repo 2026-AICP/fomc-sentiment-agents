@@ -69,6 +69,11 @@ News:Fed 50:50 을 정당화한 방식과 동일하게, **후보를 사전 고�
 
 ### 2. 홀드아웃 + 부트스트랩 — B안(1:1:1)이 전 구간에서 승리 ★
 
+![Fed 축 내부 가중치 근거](figures/comparison/fed_weights.png)
+
+*왼쪽 = 전 구간 상관과 95% 신뢰구간, 오른쪽 = 홀드아웃 3분할. 아래 두 표를 한 장으로 옮긴 것*
+(`python3 analysis/fed_weights_figure.py`)
+
 전체 구간(317개월) VIX 상관 + 블록 부트스트랩 95% CI (block=12, 3000회):
 
 | 후보 | VIX 상관 | 95% CI |
@@ -140,6 +145,7 @@ News:Fed 50:50 을 정당화한 방식과 동일하게, **후보를 사전 고�
 
 ```bash
 python3 analysis/validate_fed_weights.py   # ② 전체 (홀드아웃·부트스트랩·다중타깃·이벤트)
+python3 analysis/fed_weights_figure.py     # ② §2 그림 → docs/figures/comparison/fed_weights.png
 python3 analysis/validate_robustness.py    # ① News:Fed 50:50 견고성 (기존)
 ```
 
