@@ -49,6 +49,9 @@ GRADE_ALIGNED = "🟢 정합"
 GRADE_NEUTRAL = "⚪ 중립"
 GRADE_CAUTION = "⚠️ 주의"
 GRADE_ALERT = "🔴 경고"
+# 신뢰도 게이트 미달(표본 적음/CI 넓음) 전용 등급 — news_signals.py의 '관망'과 같은 개념.
+# 질문 5 피드백: 측정(지수·CI)은 그대로 두고 "경보만" 이 등급으로 내려 헛경보를 막는다.
+GRADE_WATCH = "⚪ 관망"
 
 
 def sign(x: Optional[float]) -> int:

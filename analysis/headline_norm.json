@@ -7,13 +7,33 @@
     "mean": 0.0842,
     "std": 0.0648
   },
+  "presser": {
+    "mean": 0.0556,
+    "std": 0.043
+  },
+  "minutes": {
+    "mean": 0.081,
+    "std": 0.1501
+  },
   "w_fed": 0.5,
   "w_news": 0.5,
+  "fed_axis_weights": {
+    "statement": 1,
+    "presser": 1,
+    "minutes": 1
+  },
   "validation": {
     "period": "2000-02-01~2021-05-01",
     "n_months": 256,
     "r_fed": -0.436,
     "r_news": -0.386,
     "r_combined": -0.534
+  },
+  "fed_axis_validation": {
+    "note": "statement:presser:minutes=1:1:1 채택 근거 — docs/fed_weights.md §2",
+    "n_meetings_presser": 93,
+    "n_meetings_minutes": 214,
+    "r_1_1_1": -0.577,
+    "r_statement_only": -0.418
   }
 }

@@ -28,18 +28,17 @@ from engine.preprocess import split_sentences
 from index.aggregate import aggregate_meeting
 from reports.report import write_report
 from analysis.signals import (signal_tone_shift, signal_divergence, signal_tone_vs_vix,
-                              signal_tone_vs_rate, grade, COMBINED_THRESHOLDS)
-from analysis.news_signals import confident   # 표본이 얇을 때 경보를 막는 신뢰도 게이트
-
-# 신뢰도 부족으로 경보를 보류한 상태 — '판단할 근거가 부족'이라는 뜻이며,
-# '특이사항 없음'(중립)과 구분해야 사용자가 오해하지 않는다.
-GRADE_HOLD = "⚪ 관망"
+                              signal_tone_vs_rate, grade, COMBINED_THRESHOLDS, GRADE_WATCH,
+                              GRADE_CAUTION, GRADE_ALERT)
 from analysis import collect_market as cm
-from analysis.analyze_alignment import get_reaction, get_ust2y_change, REACTION_OFFSET
+from analysis.analyze_alignment import (get_reaction, get_ust2y_change, REACTION_OFFSET,
+                                        fed_composite_asof, upsert_fed_composite)
 from analysis.news_index_live import index_for_window, index_pre_post
+from analysis.news_signals import confident as news_confident
 from analysis.presser_index import presser_tone, has_presser
 from analysis.minutes_index import minutes_tone, has_minutes
-from analysis.headline import combine
+from analysis.headline import combine, combine_fed_axes
+from analysis.axis_status import expected_axes
 
 if os.getenv("SENTIMENT_ENGINE", "dummy").lower() == "finbert":
     from engine.sentiment import analyze, MODEL_TAG
@@ -60,6 +59,8 @@ class State(TypedDict):
     pre_post: dict
     presser: dict
     minutes: dict
+    fed_axes: Optional[list]
+    fed_final: bool
     headline: dict
     market: dict
     signals: dict
@@ -121,51 +122,36 @@ def _analyst(state: State) -> State:
     return state
 
 
+def _fed_value_and_stats(idx):
+    """state['index'] → (combine()에 넘길 fed 값, fed_stats).
+
+    fed_composite(statement:presser:minutes 1:1:1 결합, docs/fed_weights.md)는 이미
+    z-척도이므로 combine()이 다시 표준화(raw 통계로 재-z)하면 척도가 깨진다
+    (예: composite -0.87 을 raw fed 평균 0.149/표준편차 0.1649 로 나누면 폭주).
+    그래서 fed_stats=(0,1)을 줘서 combine() 내부 _z()가 값을 그대로 통과시키게 한다.
+    fed_composite 가 없으면(레거시/에러) conf_weighted 원값 그대로 기본 표준화를 쓴다.
+    """
+    idx = idx or {}
+    if "fed_composite" in idx:
+        return idx["fed_composite"], (0.0, 1.0)
+    return idx.get("conf_weighted"), None
+
+
 # ── ②b News Analyst + Combine (headline) ──
 def news_node(state: State) -> State:
-    """발표일 주변 뉴스로 News 지수 산출 후 Fed 지수와 통합(headline).
+    """발표일 주변 뉴스로 News 지수 산출 후 Fed 지수(3축 결합)와 통합(headline).
 
     실시간 뉴스가 없으면(과거 회의) News=없음 → headline=Fed 단독 폴백.
     """
     date = state["date"]
     if not state["index"]:                       # 일별 모드(analyst 건너뜀) → Fed 톤 이월
-        from analysis.analyze_alignment import fed_tone_asof
         conn = db.connect(DB); db.init_db(conn)
-        carry = fed_tone_asof(conn, date)
+        carry = fed_composite_asof(conn, date)     # 확정판 > 속보치 > 레거시(statement 단독)
         conn.close()
-        if carry is not None:
-            state["index"] = {"conf_weighted": round(carry, 4)}
+        if carry is not None:                      # fed_composite_asof 는 항상 z-척도로 반환
+            state["index"] = {"fed_composite": round(carry, 4)}
             state["log"].append(f"[news] Fed 이월 {carry:+.3f} (일별 모드)")
-    fed = state["index"].get("conf_weighted") if state["index"] else None
-    before = int(os.getenv("NEWS_WINDOW_BEFORE", "3"))
-    after = int(os.getenv("NEWS_WINDOW_AFTER", "1"))
-    try:
-        news = index_for_window(center=date, before=before, after=after)
-    except Exception as e:
-        news = None
-        state["log"].append(f"[news] 뉴스 지수 생략: {str(e)[:35]}")
-    if news:
-        state["news"] = news
-        state["log"].append(f"[news] News {news['conf_weighted']:+.3f} (기사 {news['n_articles']}건)")
-    else:
-        state["log"].append("[news] 해당 기간 실시간 뉴스 없음 → Fed 단독")
-    h = combine(fed, news["conf_weighted"] if news else None)
-    if h:
-        state["headline"] = h
-        state["log"].append(f"[news] headline {h['headline']:+.3f} ({h['method']})")
-    # 2d Step 2: FOMC일이면 성명문(2pm ET) 전/후 뉴스 감성 분리 (시각 있는 수집분에만 유효)
-    if state["statement_path"]:
-        try:
-            pp = index_pre_post(meeting_date=date, after_days=1)
-            state["pre_post"] = pp
-            if pp["shift"] is not None:
-                state["log"].append(
-                    f"[news] 발표 전/후 {pp['pre']['conf_weighted']:+.3f}"
-                    f"→{pp['post']['conf_weighted']:+.3f} (변화 {pp['shift']:+.3f})")
-            elif pp["pre"] or pp["post"]:
-                state["log"].append("[news] 발표 전/후 한쪽 뉴스만 → 변화 계산 불가")
-        except Exception as e:
-            state["log"].append(f"[news] pre/post 생략: {str(e)[:35]}")
+
     # #4 Step 3(B1): FOMC일 & presser 트랜스크립트 있으면 성명문 vs presser 톤 괴리
     # (트랜스크립트는 회의 며칠 후 게시 → 그때 재실행 때 잡힘. 성명문과 같은 analyze 로 공정 비교.)
     if state["statement_path"] and has_presser(date):
@@ -198,6 +184,63 @@ def news_node(state: State) -> State:
                     f"[news] 회의록 톤 {mt['conf_weighted']:+.3f}{gap_s} · {mt['n_sentences']}문장")
         except Exception as e:
             state["log"].append(f"[news] 회의록 톤 생략: {str(e)[:35]}")
+
+    # Fed 축 내부 결합(statement:presser:minutes=1:1:1, docs/fed_weights.md) — 회의일에만 계산.
+    # 질문 6 피드백 "절충안" 채택: 속보치는 확정 전까지 갱신 가능(예: presser 며칠 후 도착)하되,
+    # minutes 로 3축이 다 차면 확정판을 단 한 번만 기록하고 그 뒤로는 재작성하지 않는다
+    # (analyze_alignment.upsert_fed_composite — 과거 실시간 값을 덮어쓰지 않는다는 원칙).
+    if state["statement_path"]:
+        stmt = (state["index"] or {}).get("conf_weighted")
+        fc = combine_fed_axes(stmt, (state.get("presser") or {}).get("tone"),
+                              (state.get("minutes") or {}).get("tone"))
+        if fc:
+            state["index"]["fed_composite"] = round(fc["fed_composite"], 4)
+            state["fed_axes"] = fc["axes"]
+            expected = len(expected_axes(date))
+            # 확정 기준은 "minutes 포함 여부"다 — expected_axes()는 2011-04~2018 회의도
+            # presser 를 기대하지만 실제로는 분기(SEP) 회의에만 있었다(has_presser 는 그
+            # 경우 영원히 False). n_axes>=expected 로 판정하면 그런 회의는 minutes 가
+            # 와도 영원히 확정되지 않는다 — minutes 는 유일하게 3주 지연되는 축이라
+            # 도착 시점이 곧 "더 늦게 올 축이 없다"는 뜻이므로 이것만으로 충분하다.
+            state["fed_final"] = "minutes" in fc["axes"]
+            conn = db.connect(DB); db.init_db(conn)
+            upsert_fed_composite(conn, date, fc["fed_composite"], fc["n_axes"], expected,
+                                 state["fed_final"])
+            conn.close()
+            state["log"].append(
+                f"[news] Fed 축 결합 {fc['fed_composite']:+.3f} "
+                f"({'+'.join(fc['axes'])}{', 확정판' if state['fed_final'] else ', 속보치'})")
+
+    fed, fed_stats = _fed_value_and_stats(state["index"])
+    before = int(os.getenv("NEWS_WINDOW_BEFORE", "3"))
+    after = int(os.getenv("NEWS_WINDOW_AFTER", "1"))
+    try:
+        news = index_for_window(center=date, before=before, after=after)
+    except Exception as e:
+        news = None
+        state["log"].append(f"[news] 뉴스 지수 생략: {str(e)[:35]}")
+    if news:
+        state["news"] = news
+        state["log"].append(f"[news] News {news['conf_weighted']:+.3f} (기사 {news['n_articles']}건)")
+    else:
+        state["log"].append("[news] 해당 기간 실시간 뉴스 없음 → Fed 단독")
+    h = combine(fed, news["conf_weighted"] if news else None, fed_stats=fed_stats)
+    if h:
+        state["headline"] = h
+        state["log"].append(f"[news] headline {h['headline']:+.3f} ({h['method']})")
+    # 2d Step 2: FOMC일이면 성명문(2pm ET) 전/후 뉴스 감성 분리 (시각 있는 수집분에만 유효)
+    if state["statement_path"]:
+        try:
+            pp = index_pre_post(meeting_date=date, after_days=1)
+            state["pre_post"] = pp
+            if pp["shift"] is not None:
+                state["log"].append(
+                    f"[news] 발표 전/후 {pp['pre']['conf_weighted']:+.3f}"
+                    f"→{pp['post']['conf_weighted']:+.3f} (변화 {pp['shift']:+.3f})")
+            elif pp["pre"] or pp["post"]:
+                state["log"].append("[news] 발표 전/후 한쪽 뉴스만 → 변화 계산 불가")
+        except Exception as e:
+            state["log"].append(f"[news] pre/post 생략: {str(e)[:35]}")
     return state
 
 
@@ -236,7 +279,8 @@ def strategy_node(state: State) -> State:
     # 신호 톤 = 결합(News+Fed) 지수 — 검증된 두 축 이점(-0.534)을 신호에 반영.
     tone = (state.get("headline") or {}).get("headline")
     if tone is None:                                  # 결합 없으면 Fed 단독 z 로 폴백
-        tone = (combine(state["index"].get("conf_weighted"), None) or {}).get("headline")
+        fed, fed_stats = _fed_value_and_stats(state["index"])
+        tone = (combine(fed, None, fed_stats=fed_stats) or {}).get("headline")
     reaction = state["market"].get("spx_ret_cc")
     vix_chg = state["market"].get("vix_chg")
     rate_chg = state["market"].get("ust2y_chg")
@@ -250,28 +294,44 @@ def strategy_node(state: State) -> State:
     g = grade(sigs, tone, reaction)
     fired = [s.name for s in sigs if s.fired]
 
-    # ★신뢰도 게이트 — 뉴스 표본이 얇으면 **경보만** 막는다(측정·지수는 그대로).
-    # 기사 1~2건인 날은 일별 지수가 크게 튀어(실제 +7.09 사례) 헛경보가 난다.
-    # 지수를 지우면 시계열에 구멍이 생기므로, 값은 남기고 등급만 '관망'으로 바꾼다.
-    # 뉴스가 아예 없어 Fed 단독으로 계산된 날은 뉴스 표본과 무관하므로 게이트 대상이 아니다.
+    # 질문 5 피드백(A+B 절충): 측정(지수·CI)은 그대로 두고, 뉴스 표본이 적거나(<15건)
+    # CI가 넓을 때는 "경보"만 관망으로 낮춘다 — 헛경보 방지. news_signals.confident() 재사용.
+    # 지수를 지우지 않는 이유: 기사 1~2건인 날은 일별 지수가 크게 튀지만(실측 +7.09),
+    # 값을 빼면 시계열에 구멍이 생긴다. 값은 남기고 등급만 낮춘다. 발동 목록(fired)도 기록용으로 남긴다.
     gate_reason = None
-    news = state.get("news") or {}
-    method = (state.get("headline") or {}).get("method")
-    if news and method != "fed_only":
-        ok, why = confident(news.get("n_articles", 0), news.get("ci_lo"), news.get("ci_hi"))
+    news = state.get("news")
+    if news and g in (GRADE_CAUTION, GRADE_ALERT):
+        ok, reason = news_confident(news["n_articles"], news.get("ci_lo"), news.get("ci_hi"))
         if not ok:
-            gate_reason = why
-            g = GRADE_HOLD                      # 발동 목록(fired)은 기록용으로 남긴다
-    state["signals"] = {"grade": g, "fired": fired, "gate_reason": gate_reason}
+            gate_reason = reason
+            g = GRADE_WATCH
+
+    state["signals"] = {"grade": g, "fired": fired, "gate_reason": gate_reason,
+                        "n_articles": news.get("n_articles") if news else None,
+                        "ci_lo": news.get("ci_lo") if news else None,
+                        "ci_hi": news.get("ci_hi") if news else None}
     tstr = f"{tone:+.3f}" if tone is not None else "—"
-    note = f" | 게이트: {gate_reason}" if gate_reason else ""
-    state["log"].append(f"[strategy] 등급 {g} (결합톤 {tstr}) | 발동 {fired or '없음'}{note}")
+    gate_str = f" (게이트: {gate_reason})" if gate_reason else ""
+    state["log"].append(f"[strategy] 등급 {g}{gate_str} (결합톤 {tstr}) | 발동 {fired or '없음'}")
     return state
 
 
 # ── ⑤ Reporting ──
+DAILY_FIELDS = ["date", "grade", "index", "fired", "gate_reason", "n_articles", "ci_lo", "ci_hi",
+                "fed_axes", "grade_final", "index_final", "fed_axes_final", "finalized_at"]
+
+
 def append_daily_signal(rec: dict, out=None):
-    """일별 신호 1행 누적(같은 날짜는 덮어쓰기). 최신일이 마지막 행 → 대시보드·기록용."""
+    """일별 신호 1행 누적. 최신일이 마지막 행 → 대시보드·기록용.
+
+    원칙(질문 6 피드백): "과거 실시간 값을 덮어쓰면 안 된다." 그 날짜로 처음 기록되는
+    grade/index/fed_axes(및 게이트·표본 정보)는 "속보치"로 영구 고정한다. 같은 날짜를
+    재방문해도(예: minutes 도착 후 재처리) 이 필드들은 절대 수정하지 않는다 — rec에
+    is_final=True가 실리면 grade_final/index_final/fed_axes_final 에만 그 시점 값을
+    추가로 기록한다(절충안: 속보치·확정판 이원화). fed_axes 를 확정판 값으로 덮어쓰면
+    "이 grade/index 는 몇 개 축으로 계산됐나"라는 속보치 자체의 근거가 사라지므로,
+    fed_axes 도 grade/index 와 함께 얼려두고 fed_axes_final 을 따로 둔다.
+    """
     import csv
     out = Path(out or DAILY_SIGNALS)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -279,14 +339,33 @@ def append_daily_signal(rec: dict, out=None):
     if out.exists():
         for r in csv.DictReader(open(out, encoding="utf-8")):
             rows[r["date"]] = r
-    rows[rec["date"]] = {"date": rec["date"], "grade": rec["grade"],
-                         "index": round(rec.get("index") or 0.0, 4),
-                         "fired": ";".join(rec.get("fired") or [])}
+
+    existing = rows.get(rec["date"])
+    if existing is None:
+        row = {"date": rec["date"], "grade": rec["grade"],
+              "index": round(rec.get("index") or 0.0, 4),
+              "fired": ";".join(rec.get("fired") or []),
+              "gate_reason": rec.get("gate_reason") or "",
+              "n_articles": rec.get("n_articles") if rec.get("n_articles") is not None else "",
+              "ci_lo": rec.get("ci_lo") if rec.get("ci_lo") is not None else "",
+              "ci_hi": rec.get("ci_hi") if rec.get("ci_hi") is not None else "",
+              "fed_axes": ";".join(rec.get("fed_axes") or []),
+              "grade_final": "", "index_final": "", "fed_axes_final": "", "finalized_at": ""}
+    else:
+        row = {k: existing.get(k, "") for k in DAILY_FIELDS}   # 속보치 필드 보존(옛 스키마 보정)
+
+    if rec.get("is_final"):
+        row["grade_final"] = rec["grade"]
+        row["index_final"] = round(rec.get("index") or 0.0, 4)
+        row["fed_axes_final"] = ";".join(rec.get("fed_axes") or []) or row.get("fed_axes_final", "")
+        row["finalized_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    rows[rec["date"]] = row
     with open(out, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["date", "grade", "index", "fired"])
+        w = csv.DictWriter(f, fieldnames=DAILY_FIELDS)
         w.writeheader()
         for d in sorted(rows):
-            w.writerow(rows[d])
+            w.writerow({k: rows[d].get(k, "") for k in DAILY_FIELDS})
 
 
 def _prev_combined(date, out=None):
@@ -325,21 +404,30 @@ def reporting_node(state: State) -> State:
     except Exception as e:
         state["log"].append(f"[reporting] 톤 CSV 갱신 생략: {str(e)[:35]}")
     state["report_path"] = str(path)
-    grade = state["signals"].get("grade", "—")
+    sig = state.get("signals") or {}
     combined = (state.get("headline") or {}).get("headline")   # 결합(뉴스포함)
-    fired = state["signals"].get("fired", [])
-    append_daily_signal({"date": state["date"], "grade": grade,
-                         "index": combined, "fired": fired})
-    # ★시점 기록 — 위 CSV들은 같은 날짜를 덮어쓰지만, 이 로그는 덧붙이기만 한다.
-    # 자료가 시차를 두고 도착하므로(회의록 3주 후), "그날 알던 값"을 남겨두지 않으면
+    append_daily_signal({"date": state["date"],
+                         "grade": sig.get("grade", "—"),
+                         "index": combined,
+                         "fired": sig.get("fired", []),
+                         "gate_reason": sig.get("gate_reason"),
+                         "n_articles": sig.get("n_articles"),
+                         "ci_lo": sig.get("ci_lo"), "ci_hi": sig.get("ci_hi"),
+                         "fed_axes": state.get("fed_axes"),
+                         "is_final": bool(state.get("fed_final"))})
+    # ★시점 기록 — 위 CSV는 그 날짜의 '현재 상태'를 담지만, 이 로그는 덧붙이기만 한다.
+    # 자료가 시차를 두고 도착하므로(회의록 3주 후), "언제 무엇을 알았나"를 남겨두지 않으면
     # 나중 정보가 과거 기록에 섞여 설명력·예측력 분석이 실제보다 좋아 보인다.
+    # 속보치/확정판(grade_final 등)과 역할이 다르다 — 저쪽은 '최종 상태 2개',
+    # 이쪽은 축이 하나씩 도착할 때마다의 '전체 이력'이라 분석에서 as_of 재구성이 된다.
     try:
         from analysis.vintage import record_meeting
         st = (state.get("index") or {}).get("conf_weighted")
         mn = (state.get("minutes") or {}).get("tone")
         pr = (state.get("presser") or {}).get("tone")
         record_meeting(state["date"], statement=st, minutes=mn, presser=pr,
-                       combined=combined, grade=grade, fired=fired,
+                       combined=combined, grade=sig.get("grade", "—"),
+                       fired=sig.get("fired", []),
                        n_axes=sum(v is not None for v in (st, mn, pr)))
     except Exception as e:
         state["log"].append(f"[reporting] 시점 기록 생략: {str(e)[:35]}")
@@ -371,7 +459,8 @@ def build_graph():
 
 def _init_state(date: str) -> dict:
     return {"date": date, "statement_path": "", "n_sentences": 0, "index": {},
-            "news": {}, "pre_post": {}, "presser": {}, "minutes": {}, "headline": {},
+            "news": {}, "pre_post": {}, "presser": {}, "minutes": {},
+            "fed_axes": None, "fed_final": False, "headline": {},
             "market": {}, "signals": {},
             "report_path": "", "log": [], "errors": []}
 

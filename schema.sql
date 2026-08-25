@@ -31,7 +31,9 @@ CREATE TABLE IF NOT EXISTS sentences (
 -- ③ 회의별 최종 인덱스 (방식·단위별로 동시 보관)
 CREATE TABLE IF NOT EXISTS meetings (
     date        TEXT NOT NULL,
-    method      TEXT NOT NULL,      -- label_avg | conf_weighted
+    method      TEXT NOT NULL,      -- label_avg | conf_weighted | fed_composite_realtime | fed_composite_final
+                                     -- (fed_composite_* 는 confidence 컬럼에 완성도(n_axes/expected) 기록,
+                                     --  analysis/analyze_alignment.upsert_fed_composite 참고)
     granularity TEXT NOT NULL,      -- meeting | month | quarter
     index_value REAL,
     confidence  REAL,

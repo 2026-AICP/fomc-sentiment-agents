@@ -53,6 +53,61 @@ def fed_tone_asof(con, date, method=AGG_METHOD):
     return row[0] if row else None
 
 
+def fed_composite_asof(con, date):
+    """date 시점 Fed 축 결합값(statement+presser+minutes, 1:1:1, z-척도) — 확정판 있으면
+    확정판, 없으면 속보치, 이 기능 이전 데이터(레거시, fed_composite_* 행 없음)면
+    statement 단독을 같은 z-척도로 변환해 반환(combine_fed_axes 1축 결합과 동일 계산이라
+    반환값은 항상 z-척도로 일관됨 — 호출부가 재표준화 여부를 신경 쓰지 않아도 된다).
+
+    질문 6 피드백(운영 반영 시 minutes 3주 지연 처리): '그날 이전 최신 회의'를 먼저 찾고,
+    그 회의에 한해 확정판 > 속보치 > 레거시 순으로 값을 고른다. 확정판이 나중에 추가돼도
+    이미 이월된 과거 일자의 daily_signals.csv 행은 건드리지 않는다(agents/graph.py 참고) —
+    이 함수는 그 시점에 '무엇을 보여줄지'만 결정하고, 과거 기록을 소급 수정하지 않는다.
+    """
+    row = con.execute(
+        "SELECT date FROM meetings WHERE method=? AND granularity='meeting' "
+        "AND date<=? ORDER BY date DESC LIMIT 1", (AGG_METHOD, date)).fetchone()
+    if not row:
+        return None
+    mdate = row[0]
+    for method in ("fed_composite_final", "fed_composite_realtime"):
+        v = con.execute(
+            "SELECT index_value FROM meetings WHERE date=? AND method=? AND granularity='meeting'",
+            (mdate, method)).fetchone()
+        if v is not None:
+            return v[0]
+    stmt = con.execute(
+        "SELECT index_value FROM meetings WHERE date=? AND method=? AND granularity='meeting'",
+        (mdate, AGG_METHOD)).fetchone()
+    if stmt is None:
+        return None
+    from analysis.headline import combine_fed_axes    # 지연 import(순환 회피)
+    fc = combine_fed_axes(stmt[0], None, None)
+    return fc["fed_composite"] if fc else None
+
+
+def upsert_fed_composite(con, date, value, n_axes, expected, final):
+    """Fed 축 결합값을 meetings에 기록 — 확정판(final)은 최초 1회만, 이후 절대 재작성 않음.
+
+    원칙(질문 6 피드백): "과거 실시간 값을 덮어쓰면 안 된다." 속보치(fed_composite_realtime)는
+    확정 전까지는(presser 도착 등) 갱신 가능하지만, 확정판이 이미 기록됐다면 더 손대지 않는다.
+    확정판(fed_composite_final)은 minutes 도착으로 3축이 다 찼을 때 단 한 번만 기록된다.
+    """
+    completeness = round(n_axes / expected, 4) if expected else None
+    if final:
+        con.execute("INSERT OR IGNORE INTO meetings VALUES (?,?,?,?,?)",
+                    (date, "fed_composite_final", "meeting", round(value, 4), completeness))
+    else:
+        already_final = con.execute(
+            "SELECT 1 FROM meetings WHERE date=? AND method='fed_composite_final' "
+            "AND granularity='meeting'", (date,)).fetchone()
+        if already_final:
+            return
+        con.execute("INSERT OR REPLACE INTO meetings VALUES (?,?,?,?,?)",
+                    (date, "fed_composite_realtime", "meeting", round(value, 4), completeness))
+    con.commit()
+
+
 def get_reaction(con, meeting_date, offset=REACTION_OFFSET):
     """회의일 기준 offset 거래일 뒤의 시장 반응(수익률·VIX변화)을 가져온다.
 
