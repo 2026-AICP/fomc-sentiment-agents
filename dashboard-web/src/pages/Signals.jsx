@@ -34,6 +34,8 @@ const GRADES = [
     d: "어조와 시장이 같은 방향으로 움직였습니다." },
   { label: "중립", color: "var(--muted)",
     d: "판단할 만큼 변화가 크지 않았습니다." },
+  { label: "관망", color: "var(--warn)",
+    d: "그날 수집된 기사가 적어 판단을 보류했습니다. 지수는 그대로 계산되지만 신호는 내지 않습니다." },
 ];
 
 export default function Signals() {

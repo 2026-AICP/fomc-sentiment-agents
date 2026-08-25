@@ -29,6 +29,11 @@ from index.aggregate import aggregate_meeting
 from reports.report import write_report
 from analysis.signals import (signal_tone_shift, signal_divergence, signal_tone_vs_vix,
                               signal_tone_vs_rate, grade, COMBINED_THRESHOLDS)
+from analysis.news_signals import confident   # 표본이 얇을 때 경보를 막는 신뢰도 게이트
+
+# 신뢰도 부족으로 경보를 보류한 상태 — '판단할 근거가 부족'이라는 뜻이며,
+# '특이사항 없음'(중립)과 구분해야 사용자가 오해하지 않는다.
+GRADE_HOLD = "⚪ 관망"
 from analysis import collect_market as cm
 from analysis.analyze_alignment import get_reaction, get_ust2y_change, REACTION_OFFSET
 from analysis.news_index_live import index_for_window, index_pre_post
@@ -244,9 +249,23 @@ def strategy_node(state: State) -> State:
             signal_tone_vs_rate(tone, rate_chg, th.theta_t, th.theta_rate)]
     g = grade(sigs, tone, reaction)
     fired = [s.name for s in sigs if s.fired]
-    state["signals"] = {"grade": g, "fired": fired}
+
+    # ★신뢰도 게이트 — 뉴스 표본이 얇으면 **경보만** 막는다(측정·지수는 그대로).
+    # 기사 1~2건인 날은 일별 지수가 크게 튀어(실제 +7.09 사례) 헛경보가 난다.
+    # 지수를 지우면 시계열에 구멍이 생기므로, 값은 남기고 등급만 '관망'으로 바꾼다.
+    # 뉴스가 아예 없어 Fed 단독으로 계산된 날은 뉴스 표본과 무관하므로 게이트 대상이 아니다.
+    gate_reason = None
+    news = state.get("news") or {}
+    method = (state.get("headline") or {}).get("method")
+    if news and method != "fed_only":
+        ok, why = confident(news.get("n_articles", 0), news.get("ci_lo"), news.get("ci_hi"))
+        if not ok:
+            gate_reason = why
+            g = GRADE_HOLD                      # 발동 목록(fired)은 기록용으로 남긴다
+    state["signals"] = {"grade": g, "fired": fired, "gate_reason": gate_reason}
     tstr = f"{tone:+.3f}" if tone is not None else "—"
-    state["log"].append(f"[strategy] 등급 {g} (결합톤 {tstr}) | 발동 {fired or '없음'}")
+    note = f" | 게이트: {gate_reason}" if gate_reason else ""
+    state["log"].append(f"[strategy] 등급 {g} (결합톤 {tstr}) | 발동 {fired or '없음'}{note}")
     return state
 
 
