@@ -1,6 +1,6 @@
 # UNIST Dumbo HPC (GPU) 사용 정보 — AICP 2026
 
-> 재파인튜닝·대량 처리 때 사용. 지금 검증 단계는 노트북 CPU로 충분(불필요).
+> 대량 처리 때 사용. 지금 검증 단계는 노트북 CPU로 충분(불필요).
 > 근거: UNIST Dumbo HPC User Guide v10. 사용기간 ~12/31.
 
 ## 접속
@@ -67,9 +67,9 @@ sinfo                        # 노드/partition 상태
 |---|---|
 | 감성 추론 (FOMC/뉴스) | CPU로 충분. GPU면 빠름 |
 | 대량 뉴스 자동수집 (Phase 7) | GPU 권장 |
-| **모델 재파인튜닝** | **GPU 강력 권장** ← 주 용도 |
+| **대규모 모델 작업** | **GPU 강력 권장** |
 
-→ 지금(검증)은 불필요. 재파인튜닝/Phase 7 때 활용.
+→ 지금(검증)은 불필요. 대량 처리/Phase 7 때 활용.
 
 ## 세팅 순서 (실제 쓸 때, 한 명이 대표로)
 
@@ -77,7 +77,7 @@ sinfo                        # 노드/partition 상태
 1. (캠퍼스망/VPN) ssh -p 2123 aicp419@dlogin01.usc.unist.ac.kr → passwd 변경
 2. mkdir -p ~/shared/models ~/shared/data
 3. 코드:   git clone https://github.com/2026-AICP/fomc-sentiment-agents.git
-4. 모델:   드롭박스 모델 → ~/shared/models/finbert-finetuned/ (scp/rsync)
+4. 모델:   감성 모델 → ~/shared/models/finbert-finetuned/ (scp/rsync)
 5. 데이터: WSJ/FOMC → ~/shared/data/
 6. 환경:   module load conda/pytorch  (또는 개인 conda)
 7. 테스트: srun --partition=gpu_v100 --gres=gpu:1 --pty python3 -c "import torch;print(torch.cuda.is_available())"

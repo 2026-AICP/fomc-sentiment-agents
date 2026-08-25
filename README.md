@@ -14,7 +14,7 @@ News & Fed Sentiment Index를 산출하고, S&P500·VIX 등 시장 지표와 비
 
 ## 현재 상태
 - **Phase 0~2** ✅ 스캐폴딩 + 더미 엔진 end-to-end
-- **Phase 3** ✅ FinBERT 엔진 통합 (작년 파인튜닝 모델, 원본 T=1)
+- **Phase 3** ✅ 감성 분석 엔진 통합 (T=1)
 - **Phase 4** ✅ 인덱스 집계 방식 비교 (`docs/phase4_index.md`)
 - **Phase 5** ✅ 시장 비교(S&P500·VIX) + 톤-반응 정합성 (`docs/phase5_comparison.md`)
 - **Phase 6** ✅ 신호 규칙셋(A·B·C) + 백테스트 + 자동보고서 (`docs/phase6_signals.md`)
@@ -27,7 +27,7 @@ News & Fed Sentiment Index를 산출하고, S&P500·VIX 등 시장 지표와 비
 ## 구조
 ```
 engine/    수집·전처리·감성엔진
-  ├ sentiment.py      진짜 FinBERT 엔진 (확률·엔트로피)
+  ├ sentiment.py      감성 분석 엔진 (확률·엔트로피)
   ├ dummy_sentiment.py 더미 엔진 (테스트용)
   ├ scrape.py         FOMC 성명문 스크래퍼
   └ news_scrape.py    Fed 뉴스 스크래퍼 (Marketaux, F∧M 키워드)
@@ -48,12 +48,11 @@ tests/     검증 + 고정 픽스처
 
 **1. 의존성 설치**
 ```bash
-pip install -r requirements.txt    # 감성엔진엔 transformers, torch 필요
+pip install -r requirements.txt    # 감성 엔진엔 transformers, torch 필요
 ```
 
 **2. 모델 배치 (★중요 — git 에 없음)**
-파인튜닝 FinBERT 모델(419MB)은 용량 때문에 git 에 포함하지 않는다.
-**드롭박스에서 받아** 아래 경로에 둔다:
+감성 모델 가중치는 저장소에 포함하지 않는다. **팀 내부 안내에 따라 받아** 아래 경로에 둔다:
 ```
 models/finbert-finetuned/
   ├ config.json
@@ -68,7 +67,7 @@ models/finbert-finetuned/
 # 더미 엔진 (기본, 모델 불필요 — 배관 테스트용)
 python3 pipeline.py
 
-# 진짜 FinBERT 엔진 (모델 필요)
+# 실제 감성 모델 (모델 파일 필요)
 SENTIMENT_ENGINE=finbert python3 pipeline.py
 
 # 멀티에이전트 (Phase 7) — 단건 / 무인 다건
@@ -87,9 +86,9 @@ python3 -m pytest
 ## 엔진 설정 (환경변수)
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `SENTIMENT_ENGINE` | `dummy` | `finbert` 면 진짜 엔진 |
+| `SENTIMENT_ENGINE` | `dummy` | `finbert` 면 실제 감성 모델 사용 |
 | `FINBERT_MODEL_DIR` | `models/finbert-finetuned` | 모델 경로 |
-| `FINBERT_TEMPERATURE` | `1.0` | 온도. 기본=원본 FinBERT. (지도교수 피드백으로 자체 라벨 보정 제외) |
+| `FINBERT_TEMPERATURE` | `1.0` | 온도. 기본=모델 출력 그대로. (지도교수 피드백으로 자체 라벨 보정 제외) |
 | `NEWS_API_KEY` | (`.newsapi_key` 파일) | Marketaux 키. 코드·git 에 넣지 말 것(각자 발급) |
 | `NEWS_WINDOW_BEFORE`/`AFTER` | `3`/`1` | 발표일 전후 뉴스 창(일) |
 

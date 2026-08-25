@@ -1,7 +1,7 @@
 # Phase 6 — 규칙셋 + 백테스트 + 자동보고서
 
 > 상태: 완료. 담당 이어받기. Phase 5(정합성) 위에서 신호 규칙·검증·보고서 구현.
-> 데이터: FOMC 성명문 **188건 (2000–2021)**, 진짜 FinBERT(finbert-cal, T=3.1), 톤=conf_weighted.
+> 데이터: FOMC 성명문 **188건 (2000–2021)**, FinBERT(원본 T=1), 톤=conf_weighted.
 > 근거 설계: `docs/signal_design.md`. 계획: `docs/phase6_plan.md`.
 
 ---

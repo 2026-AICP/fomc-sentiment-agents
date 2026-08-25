@@ -1,7 +1,8 @@
 # Phase 5 — S&P500·VIX·FOMC 비교분석
 
 > 담당: EconPilot · 상태: 정합성 분석 골조 완료(방식 ①), 서프라이즈 방식(②)·VIX·이벤트 스터디는 후속 과제
-> 대상 데이터: 회의 6건 (2000년 5건 + 2025년 1건), 진짜 FinBERT(finbert-cal) 기준
+> 대상 데이터: 회의 6건 (2000년 5건 + 2025년 1건)
+> ※ 이 문서의 수치는 **원본 FinBERT(T=1) 전환 이전**(보정 엔진) 산출 — 파이프라인 재실행 시 갱신 필요.
 
 ---
 
@@ -14,7 +15,7 @@
 | `pipeline.py` (실행부 수정) | fixtures 폴더의 모든 성명문을 자동 순회하며 처리하도록 개선 |
 
 - 원문: `tests/fixtures/FOMC_<날짜>_statement.txt` 형식으로 6건 배치.
-- 진짜 FinBERT 엔진 탑재 완료: `models/finbert-finetuned/` (7개 파일, pytorch_model.bin 418.75MB).
+- 감성 분석 엔진 탑재 완료: `models/finbert-finetuned/` (모델 파일은 저장소 외부).
 - 실행: `SENTIMENT_ENGINE=finbert python3 pipeline.py` → 6건 전부 성공 처리.
 
 ---
@@ -105,7 +106,7 @@
 source venv/bin/activate
 pip install -r requirements.txt        # transformers, torch, yfinance 포함
 
-# 1. 모델 배치 확인 (git에 없음 — 드롭박스에서 받아 배치)
+# 1. 모델 배치 확인 (git에 없음 — 팀 내부 안내에 따라 배치)
 #    models/finbert-finetuned/ 에 7개 파일 (pytorch_model.bin 418.75MB 등)
 ls models/finbert-finetuned/
 
