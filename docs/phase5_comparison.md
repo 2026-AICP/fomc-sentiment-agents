@@ -15,7 +15,7 @@
 | `pipeline.py` (실행부 수정) | fixtures 폴더의 모든 성명문을 자동 순회하며 처리하도록 개선 |
 
 - 원문: `tests/fixtures/FOMC_<날짜>_statement.txt` 형식으로 6건 배치.
-- 진짜 FinBERT 엔진 탑재 완료: `models/finbert-finetuned/` (7개 파일, pytorch_model.bin 418.75MB).
+- 감성 분석 엔진 탑재 완료: `models/finbert-finetuned/` (모델 파일은 저장소 외부).
 - 실행: `SENTIMENT_ENGINE=finbert python3 pipeline.py` → 6건 전부 성공 처리.
 
 ---
@@ -106,7 +106,7 @@
 source venv/bin/activate
 pip install -r requirements.txt        # transformers, torch, yfinance 포함
 
-# 1. 모델 배치 확인 (git에 없음 — 드롭박스에서 받아 배치)
+# 1. 모델 배치 확인 (git에 없음 — 팀 내부 안내에 따라 배치)
 #    models/finbert-finetuned/ 에 7개 파일 (pytorch_model.bin 418.75MB 등)
 ls models/finbert-finetuned/
 

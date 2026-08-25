@@ -67,7 +67,7 @@ cd dashboard-web && npm install && npm run dev                   # localhost:517
 | 대상 | 이유 |
 |---|---|
 | API 키 (`.newsapi_key`, `.fredapi_key`, `.env`) | 유출 위험. gitignore돼 있지만 **채팅·이슈에도 붙여넣지 말 것** |
-| FinBERT 모델 (419MB) | 용량. 드롭박스에서 받아 `models/finbert-finetuned/` 에 둔다 |
+| 감성 모델 가중치 | 용량·배포 정책. 팀 내부 안내에 따라 받아 `models/finbert-finetuned/` 에 둔다 |
 | `data/wsj/` | 용량. 별도 공유 |
 
 커밋 전 습관:
