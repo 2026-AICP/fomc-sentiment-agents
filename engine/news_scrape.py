@@ -184,7 +184,39 @@ def collect(days_back=3, pages=5, out=OUT):
         for a in new:
             w.writerow([a["date"], a["title"], a["description"], a["source"],
                         a["url"], a["published_at"]])
+    _log_rejected(raw, articles)
     return articles, new, found
+
+
+# 필터가 걸러낸 기사 — 감사(놓친 기사 점검)용 보관. 지수에는 쓰지 않는다.
+REJECTED = ROOT / "data" / "news" / "rejected_news.csv"
+
+
+def _log_rejected(raw, kept, out=REJECTED):
+    """탈락 기사 기록 — "필터가 중요한 기사를 얼마나 놓치는가"를 나중에 점검하려면
+    버리지 말고 남겨야 한다. url 중복은 건너뛰어 같은 기사가 쌓이지 않게 한다."""
+    kept_urls = {a["url"] for a in kept}
+    rejected = [a for a in raw if a.get("url") and a["url"] not in kept_urls]
+    if not rejected:
+        return 0
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    seen = set()
+    if out.exists():
+        with open(out, encoding="utf-8-sig") as f:
+            seen = {r.get("url", "") for r in csv.DictReader(f)}
+    fresh = [a for a in rejected if a["url"] not in seen]
+    if not fresh:
+        return 0
+    write_header = not out.exists()
+    with open(out, "a", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f)
+        if write_header:
+            w.writerow(["date", "title", "description", "source", "url", "published_at"])
+        for a in fresh:
+            w.writerow([a["date"], a["title"], a["description"], a["source"],
+                        a["url"], a["published_at"]])
+    return len(fresh)
 
 
 if __name__ == "__main__":
