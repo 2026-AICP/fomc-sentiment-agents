@@ -1,0 +1,116 @@
+"""2년물 국채금리 반응 — secondary outcome (조교 피드백 질문 4-1 ②).
+
+금리결정(3분류)이 primary, **2년물 반응이 secondary** 다. 조교 피드백:
+"다음 회의까지의 변화보다 **짧은 window 부터** 보는 게 더 좋다" → 1·2·5거래일.
+
+★검증하는 것 (조교님 표현을 그대로 따른다):
+  "Fed communication tone 이 이후 Fed policy action 과 얼마나 정렬되어 있는지,
+   그리고 **기존 정보에 추가적인 정보가 있는지**"
+
+그래서 톤 하나만 넣고 R² 를 보는 게 아니라, **이미 아는 것을 먼저 넣고** 톤이
+그 위에 무엇을 더하는지만 본다. 중첩 모형은 사전에 고정한다:
+
+  B0  결정 더미        인상·인하 (동결 기준) — 발표된 결정 그 자체
+  B1  + 사전 기대      회의 전 20거래일 2년물 변화 (시장이 이미 반영한 부분)
+  B2  + 성명문 톤      톤이 결정·기대 너머로 추가 정보를 주는가
+
+★여기서는 동시점 톤을 쓰는 것이 맞다. primary(금리결정)에서는 성명문이 결정을
+  서술하므로 동시점 톤이 누출이었지만, 여기서는 **톤이 원인 쪽, 금리 반응이 결과 쪽**
+  이다. 다만 결정 자체가 금리를 움직이므로 B0 로 반드시 통제한다 — 통제 없이 톤만
+  넣으면 "결정의 효과"를 톤의 공로로 오인한다.
+
+★종속변수가 연속이므로 여기서는 OLS 가 맞다. 조교님이 OLS 를 물린 것은
+  primary(인상/동결/인하 3범주)에 한한 지적이다.
+
+★표준오차는 HAC(Newey-West) 를 쓴다 — 회의 간격이 불규칙하고 잔차에 자기상관이
+  남을 수 있어 단순 OLS 표준오차는 유의성을 과대평가한다.
+
+실행:  python3 analysis/policy_rate2y.py
+산출:  outputs/policy_rate2y.csv
+"""
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+DATA = ROOT / "outputs" / "policy_dataset.csv"
+OUT = ROOT / "outputs" / "policy_rate2y.csv"
+
+WINDOWS = (1, 2, 5)          # 거래일 — 짧은 것부터
+HAC_LAGS = 4                 # Newey-West 시차
+
+MODELS = [
+    ("B0 결정",       ["dec_Hike", "dec_Cut"]),
+    ("B1 +사전기대",  ["dec_Hike", "dec_Cut", "d2y_pre20"]),
+    ("B2 +성명문톤",  ["dec_Hike", "dec_Cut", "d2y_pre20", "stmt"]),
+]
+
+
+def load() -> pd.DataFrame:
+    if not DATA.exists():
+        raise SystemExit(f"{DATA} 없음 — 먼저 analysis/policy_dataset.py 를 실행하세요.")
+    d = pd.read_csv(DATA, parse_dates=["date"])
+    d["dec_Hike"] = (d.decision == "Hike").astype(float)
+    d["dec_Cut"] = (d.decision == "Cut").astype(float)
+    return d
+
+
+def run_window(d: pd.DataFrame, w: int, rows: list) -> None:
+    import statsmodels.api as sm
+
+    y_col = f"d2y_post{w}"
+    need = ["stmt", "d2y_pre20", y_col]
+    sub = d.dropna(subset=need).reset_index(drop=True)
+
+    print(f"\n[{w}거래일 반응]  n={len(sub)}  "
+          f"({sub.date.min().date()} ~ {sub.date.max().date()})")
+    print(f"  종속변수 표준편차 {sub[y_col].std():.4f}%p")
+    print(f"  {'모형':<14}{'R²':>8}{'ΔR²':>8}{'톤 계수':>11}{'HAC t':>8}{'p':>8}")
+    print("  " + "-" * 57)
+
+    prev_r2 = None
+    for name, cols in MODELS:
+        X = sm.add_constant(sub[cols].astype(float), has_constant="add")
+        res = sm.OLS(sub[y_col].astype(float), X).fit(
+            cov_type="HAC", cov_kwds={"maxlags": HAC_LAGS})
+        d_r2 = "" if prev_r2 is None else f"{res.rsquared - prev_r2:+.3f}"
+        if "stmt" in cols:
+            b, t, p = res.params["stmt"], res.tvalues["stmt"], res.pvalues["stmt"]
+            tone = f"{b:>+11.4f}{t:>8.2f}{p:>8.3f}"
+        else:
+            tone = f"{'—':>11}{'—':>8}{'—':>8}"
+        print(f"  {name:<14}{res.rsquared:>8.3f}{d_r2:>8}{tone}")
+        rows.append({"window_days": w, "model": name, "n": len(sub),
+                     "r2": round(res.rsquared, 4),
+                     "delta_r2": None if prev_r2 is None else round(res.rsquared - prev_r2, 4),
+                     "tone_coef": round(float(res.params.get("stmt", np.nan)), 5)
+                     if "stmt" in cols else None,
+                     "tone_p_hac": round(float(res.pvalues.get("stmt", np.nan)), 4)
+                     if "stmt" in cols else None})
+        prev_r2 = res.rsquared
+
+
+def main():
+    d = load()
+    print("=" * 62)
+    print("2년물 반응 — secondary outcome")
+    print("=" * 62)
+    print("검증: Fed 톤이 '발표된 결정 + 시장의 사전 기대' 위에 추가 정보를 주는가")
+
+    rows: list = []
+    for w in WINDOWS:
+        run_window(d, w, rows)
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_csv(OUT, index=False)
+    print("\n  ΔR² 는 앞 모형 대비 증가분이다. 조교 피드백대로 R² 절대값만으로 "
+          "의미를 주장하지 않는다 —\n  판단은 톤 계수의 부호·크기와 HAC p값으로 한다.")
+    print(f"\n→ {OUT}")
+
+
+if __name__ == "__main__":
+    main()

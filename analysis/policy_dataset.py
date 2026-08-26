@@ -52,7 +52,13 @@ NEWS_CSV = ROOT / "outputs" / "news_index.csv"
 
 HOLD_BAND = 0.05        # |목표금리 변화| 이 이하면 동결 (tone_vs_policy 와 동일)
 MINUTES_LAG_DAYS = 21   # 회의록 공개까지 걸리는 기간(약 3주)
-D2Y_WINDOWS = (5, 20)   # 2년물 사전 변화 창(거래일) — 조교 피드백: 창을 짧게
+
+# 2년물은 **두 가지 역할**을 한다 — 섞으면 안 된다.
+#   사전(pre)  : 회의 전 변화 = 시장이 이미 반영한 기대 → 통제변수(예측자)
+#   사후(post) : 발표 후 변화 = 조교 피드백의 "secondary outcome" → 종속변수
+# 조교 피드백: 사후 창은 "다음 회의까지"처럼 길게 잡지 말고 **짧은 것부터** 본다.
+D2Y_PRE_WINDOWS = (5, 20)
+D2Y_POST_WINDOWS = (1, 2, 5)
 
 
 def classify(chg: float) -> str:
@@ -142,12 +148,14 @@ def build() -> pd.DataFrame:
     else:
         t["news_pre"] = np.nan
 
-    # 2년물 — 회의 직전 N거래일 변화 (시장의 사전 기대)
+    # 2년물 — 사전(통제변수) · 사후(secondary outcome)
     d2y = fetch_series("DGS2", s_lo, s_hi)
     if d2y is not None and len(d2y):
         d2y = d2y.sort_index()
-        for w in D2Y_WINDOWS:
+        for w in D2Y_PRE_WINDOWS:
             t[f"d2y_pre{w}"] = t.date.apply(lambda d, w=w: _pre_change(d2y, d, w))
+        for w in D2Y_POST_WINDOWS:
+            t[f"d2y_post{w}"] = t.date.apply(lambda d, w=w: _post_change(d2y, d, w))
     return t
 
 
@@ -157,6 +165,20 @@ def _pre_change(series: pd.Series, meeting_date, win_days: int):
     if len(past) < win_days + 1:
         return np.nan
     return float(past.iloc[-1] - past.iloc[-(win_days + 1)])
+
+
+def _post_change(series: pd.Series, meeting_date, win_days: int):
+    """회의 당일 종가 → win_days 거래일 뒤 종가 변화 (발표 반응).
+
+    성명문은 미 동부 오후 2시 발표라 **당일 종가에 이미 반영**된다. 그래서 기준점을
+    회의 전날 종가로 잡으면 발표 반응과 당일 장중 다른 요인이 섞인다. 여기서는
+    보수적으로 '회의 당일 직전 거래일 종가 → +win_days 거래일 종가'로 잡아
+    발표 당일 반응을 포함시킨다(창 1이 곧 발표 당일 반응).
+    """
+    base_idx = series.index.searchsorted(meeting_date, side="left")   # 회의일 직전 위치
+    if base_idx == 0 or base_idx - 1 + win_days >= len(series):
+        return np.nan
+    return float(series.iloc[base_idx - 1 + win_days] - series.iloc[base_idx - 1])
 
 
 def summarize(t: pd.DataFrame) -> None:
@@ -173,7 +195,8 @@ def summarize(t: pd.DataFrame) -> None:
 
     print("\n예측자 가용성 (결측 아닌 비율)")
     for c in ("stmt_prev", "presser_prev", "minutes_prev", "news_pre",
-              *[f"d2y_pre{w}" for w in D2Y_WINDOWS]):
+              *[f"d2y_pre{w}" for w in D2Y_PRE_WINDOWS],
+              *[f"d2y_post{w}" for w in D2Y_POST_WINDOWS]):
         if c in t.columns:
             print(f"  {c:<16}{t[c].notna().mean():>6.1%}  ({int(t[c].notna().sum())}건)")
 
