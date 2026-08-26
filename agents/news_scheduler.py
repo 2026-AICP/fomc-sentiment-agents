@@ -25,19 +25,27 @@ from analysis import news_index_live
 from agents import runlog
 
 NEWS_LOG = ROOT / "logs" / "news_runs.jsonl"
+# 수집 창 기본값 — 함수 기본값과 CLI 기본값을 여기 한 곳에서만 정한다.
+# (2026-08 까지 run() 은 2, CLI 는 3 으로 갈라져 있었고 실제 운영은 CLI 쪽 3 이었다.)
+DEFAULT_DAYS_BACK = 3
 
 
-def run(days_back=2, pages=80):
+def run(days_back=DEFAULT_DAYS_BACK, pages=80):
     """뉴스 수집(API) → 일별 News 지수(FinBERT) → 로그 → 오늘의 감성 요약.
 
-    하루 수집량 = pages*3 건(요청당 3건은 무료 티어 상한). 80쪽=240건, 요청 80/100.
+    하루 수집량 = pages*3 건(요청당 3건은 무료 티어 상한).
 
     ★2026-08 상향(40→80): 뉴스가 많던 7월엔 최신순 120건이 대부분 신규라 실행당
-    40~57건이 쌓였는데, 8월 들어 그 120건이 3일 창 전체에 퍼지며 대부분 이미 가진
+    40~57건이 쌓였는데, 8월 들어 그 120건이 창 전체에 퍼지며 대부분 이미 가진
     기사와 겹쳐 실행당 4~11건으로 떨어졌다. 그 결과 일별 기사가 신뢰도 게이트 하한
     (15건, news_signals.Thresholds)을 못 넘어 사이트가 '낮음'으로 도배됐다.
-    실측: 2일 창에서 API 매칭 351건 중 우리가 받는 건 120건(34%) — 남은 2/3 은
-    필터가 버린 게 아니라 애초에 가져오지도 않은 것이었다.
+
+    실측(2026-08-25 CI · 3일 창 · pages=80 · 질의문 변경 전):
+      API 매칭 555건 → 받음 189건 → F∧M 통과 25건(13%) → 신규 저장 16건(중복 9)
+      page 64 에서 HTTP 402 usage_limit_reached 로 중단.
+    회수율·통과율은 2026-08-26 에 질의문(F 필수)과 페이지 실패 처리로 대응했다 —
+    경위는 engine/news_scrape.py 의 QUERY·discover_news 주석 참조. 위 수치는 그
+    이전 상태의 기록이다.
 
     양을 늘리는 방법은 둘인데 성질이 다르다. 여기서 쓰는 건 앞의 것이다:
       · 같은 필터로 더 깊이 긁기  → 모집단 그대로, 표본만 확대. 순수 이득.
@@ -82,7 +90,7 @@ def run(days_back=2, pages=80):
 
 if __name__ == "__main__":
     argv = sys.argv[1:]
-    days = int(argv[argv.index("--days") + 1]) if "--days" in argv else 3
+    days = int(argv[argv.index("--days") + 1]) if "--days" in argv else DEFAULT_DAYS_BACK
     try:  # Windows cp949 콘솔에서도 이모지 출력
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
