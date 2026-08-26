@@ -26,10 +26,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENDPOINT = "https://api.marketaux.com/v1/news/all"
-# Marketaux 검색문법: | = OR, "구절" = 정확구절. 여기선 F·핵심 M 앵커로 넓게 후보 수집 →
-# 정밀 규칙(F그룹 AND M그룹)은 아래 is_relevant 가 최종 적용 (지도교수 세트, 2026-07).
-QUERY = ('"federal reserve" | fed | Powell | Warsh | Yellen | "monetary policy" '
-         '| "central bank" | "fed funds rate" | "interest rates" | "quantitative easing"')
+# Marketaux 검색문법: | = OR, "구절" = 정확구절.
+# ★2026-08: 예전 질의문은 M그룹 단어까지 OR 로 이어붙여 "interest rates" 하나만 걸린
+#   기사 — 즉 **연준 언급이 아예 없는 기사** — 까지 받아왔다. 그런데 아래 is_relevant 는
+#   F그룹(연준)을 필수로 요구하므로 그런 기사는 100% 탈락이 확정돼 있다. 받는 순간 낭비다.
+#   실측(3일 창): 매칭 570건 중 189건만 회수되고 그중 13%만 통과.
+#   F 를 질의문에서도 필수로 걸면 풀이 292건으로 줄어 80쪽(240건) 안에 대부분 회수된다.
+#   M 까지 질의문에 넣지 않는 이유: M그룹 27개를 다 못 넣으면 빠진 단어(discount window,
+#   bernanke, ECB 등)만 가진 기사를 놓친다. F 만 거는 건 필터의 필수조건과 같아서 손실이 없다.
+#   정밀 규칙(F그룹 AND M그룹)은 그대로 is_relevant 가 적용한다 (지도교수 세트, 2026-07).
+QUERY = '"federal reserve" | fed'
 PER_PAGE = 3            # 무료 티어 상한(요청당 3건). 유료면 상향 가능.
 OUT = ROOT / "data" / "news" / "fed_news.csv"
 
@@ -109,34 +115,55 @@ def _one_page(key, from_date, page):
     return arts, found
 
 
+MAX_FAIL_STREAK = 3     # 연속 실패가 이만큼이면 API 이상으로 보고 중단
+
+
 def discover_news(days_back=3, pages=5, retries=2):
     """최근 days_back 일의 Fed 관련 기사 → ([{date,title,description,source,url,published_at}, ...], found).
 
     무료 티어(요청당 3건)라 pages 쪽까지 이어받아 모은다(최대 pages*3건).
 
-    견고화(CI 안정성): 페이지별 일시 오류(429·네트워크)는 backoff 재시도하고,
-    그래도 실패하면 **그때까지 모은 기사를 유지한 채 중단**한다 — 한 페이지 실패로
-    수집 전체가 전멸(예외 전파)하던 것을 방지. 빈 페이지는 결과 소진으로 보고 정상 종료.
+    견고화 — 실패한 페이지는 **건너뛰고 다음 페이지로 간다**:
+    ★2026-08: 예전엔 한 페이지가 재시도까지 실패하면 그 자리에서 전체를 중단했다.
+      40쪽일 땐 손해가 작았지만 80쪽으로 늘린 뒤, 64쪽에서 ReadTimeout 한 번이 나
+      남은 17쪽(=51건)을 통째로 버렸다(실측: 240건 요청 → 189건 수신).
+      결과가 바닥난 것과 일시 오류는 다르므로 구분해서 처리한다.
+        · 빈 페이지        → 결과 소진. 정상 종료.
+        · 한 페이지 실패    → 건너뛰고 계속. 그 3건만 포기.
+        · 연속 3쪽 실패     → API 이상(쿼터 소진·장애)으로 보고 중단.
+          누적이 아니라 '연속'인 이유: 간헐적 타임아웃은 계속 진행해야 손해가 없고,
+          진짜로 죽었을 때만 남은 요청을 아껴야 한다.
     """
     key = _api_key()
     from_dt = datetime.now(timezone.utc) - timedelta(days=days_back)
     from_date = from_dt.strftime("%Y-%m-%dT%H:%M")
-    out, found = [], None
+    out, found, skipped, streak = [], None, 0, 0
     for p in range(1, pages + 1):
+        arts, last = None, ""
         for attempt in range(retries + 1):
             try:
                 arts, found = _one_page(key, from_date, p)
                 break
             except RuntimeError as e:
+                last = str(e)[:45]
                 if attempt < retries:
                     time.sleep(0.8 * (attempt + 1))          # 지수 backoff 후 재시도
-                else:                                        # 재시도 소진 → 부분수집 보존, 중단
-                    print(f"  ⚠ page {p} 실패({str(e)[:45]}) — 지금까지 {len(out)}건 유지하고 중단")
-                    return out, found
+        if arts is None:                                     # 재시도 소진 → 이 페이지만 포기
+            skipped += 1
+            streak += 1
+            if streak >= MAX_FAIL_STREAK:
+                print(f"  ⚠ {streak}쪽 연속 실패({last}) — API 이상으로 보고 중단"
+                      f" (지금까지 {len(out)}건 유지)")
+                break
+            print(f"  ⚠ page {p} 건너뜀({last})")
+            continue
+        streak = 0
         if not arts:                                         # 빈 페이지 = 결과 소진 → 정상 종료
             break
         out.extend(arts)
         time.sleep(0.4)                                      # 폴라이트(무료 티어 속도제한 여유)
+    if skipped:
+        print(f"  ⚠ 건너뛴 페이지 {skipped}쪽 — 최대 {skipped * PER_PAGE}건 놓침")
     return out, found
 
 
