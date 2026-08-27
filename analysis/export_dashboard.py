@@ -8,6 +8,7 @@ React/Lovable 등 웹 프론트는 파이썬을 못 돌리므로, DB·CSV의 분
   meetings.json       회의별 Fed 톤 (conf_weighted, confidence)
   alerts.json         회의별 신호 (등급·발동·톤·시장반응) — 검증된 signals 엔진 재사용
   news_daily.json     일별 News 지수 (+ 부트스트랩 CI, 기사수)
+  daily_headline.json 일별 통합 감성지수 = News : Fed(성명문·회의록·기자회견 1:1:1) = 1:1
   daily_signals.json  일별 통합 신호 누적 (에이전트 산출)
   market.json         시장 (S&P·VIX·2Y·10Y) — 차트용
   presser.json        회의별 성명문 vs 기자회견 톤·괴리
@@ -69,6 +70,24 @@ def export_news_daily():
              "index": _f(r["conf_weighted"]), "ci_lo": _f(r["ci_lo"]),
              "ci_hi": _f(r["ci_hi"]), "confidence": _f(r["confidence"], 3)}
             for r in _csv_rows(ROOT / "outputs" / "news_index_live.csv")]
+
+
+def export_daily_headline():
+    """일별 통합 감성지수 — News : Fed = 1:1, Fed 내부는 성명문:회의록:기자회견 = 1:1:1.
+
+    홈 화면의 '통합 감성지수'가 읽는 시계열. 이 파일이 없던 동안 홈은 news_daily(뉴스 단독)를
+    읽으면서 이름만 '통합'이라 붙이고 있었다(2026-08 발견).
+
+    ★척도 주의: headline 은 각 축을 z-표준화해 합친 **상대값**이라 0이 과거 평균이고,
+    뉴스 원값처럼 -1~+1 범위가 아니다. 게다가 현재 z 파라미터(headline_norm.json)가
+    월별 집계에서 나온 값이라 일별에 쓰면 크기가 약 4배 부풀려진다 — 부호와 상대 순서는
+    맞지만 절대 크기는 아직 신뢰할 수 없다. 정상 수집이 쌓인 뒤 일별 분포로 재추정할 것.
+    """
+    return [{"date": r["date"], "index": _f(r["headline"]),
+             "fed": _f(r["fed_carry"]), "news": _f(r["news"]),
+             "method": r.get("method") or None,
+             "n_articles": int(r["n_articles"]) if r.get("n_articles") else None}
+            for r in _csv_rows(ROOT / "outputs" / "daily_headline.csv")]
 
 
 def export_daily_signals():
@@ -201,6 +220,7 @@ def main():
         "meetings.json": export_meetings(con),
         "alerts.json": export_alerts(con),
         "news_daily.json": export_news_daily(),
+        "daily_headline.json": export_daily_headline(),
         "daily_signals.json": export_daily_signals(),
         "market.json": export_market(con),
         "presser.json": export_presser(),

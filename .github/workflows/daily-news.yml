@@ -72,10 +72,15 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # 경로별 개별 add — git add 는 한 경로라도 없으면 통째 실패(아무것도 스테이지 안 됨)하므로
           # 파일마다 따로 add 해 존재하는 것만 확실히 스테이지한다(수집분 유실 방지).
+          # data/fomc.db — 회의별 지수와 Fed 3축 결합(fed_composite_realtime/final)이 여기 산다.
+          # *.db 가 gitignore 라 목록에 없으면 러너와 함께 사라져, 매 실행이 빈 DB 로 시작하고
+          # 3축 결합이 영영 안 쌓인다(2026-08: 그래서 통합 지수가 사실상 성명문 단독이었다).
+          # 확정판을 '단 한 번만' 기록한다는 설계도 DB 가 남아야 성립한다.
           # data/news/rejected_news.csv — 필터가 버린 기사. data/news/ 가 gitignore 라
           # 여기 목록에 없으면 러너가 사라질 때 함께 증발한다(2026-08: 하루 164건이 그렇게
           # 유실됐다). 필터 감사(docs/filter_audit.md)의 유일한 표본이므로 반드시 보존한다.
           for p in outputs/news_index_live.csv outputs/daily_headline.csv outputs/daily_signals.csv data/news/fed_news.csv data/news/rejected_news.csv data/statements data/minutes data/pressers \
+                   data/fomc.db \
                    outputs/axis_status.csv outputs/minutes_tones.csv outputs/presser_tones.csv \
                    outputs/vintage_meetings.csv \
                    dashboard-web/public/data; do
