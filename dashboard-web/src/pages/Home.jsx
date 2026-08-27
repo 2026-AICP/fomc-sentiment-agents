@@ -38,7 +38,8 @@ function Spark({ values, w = 300, h = 44 }) {
 }
 
 export default function Home() {
-  const { data: daily } = useJson("news_daily");
+  const { data: daily } = useJson("news_daily");        // 뉴스 단독 — 기사 수·CI 용
+  const { data: combined } = useJson("daily_headline"); // 통합 = 뉴스 : Fed(1:1:1) = 1:1
   const { data: alerts } = useJson("alerts");
   const { data: minutes } = useJson("minutes");
   const { data: presser } = useJson("presser");
@@ -46,13 +47,17 @@ export default function Home() {
   const { data: market } = useJson("market");
   const { data: news } = useJson("news_headlines");
   const { data: meta } = useJson("meta");
-  if (!daily || !alerts || !meta || !market) return <div className="loading">데이터 로딩…</div>;
+  if (!daily || !combined || !alerts || !meta || !market)
+    return <div className="loading">데이터 로딩…</div>;
 
   const byDate = (arr) => Object.fromEntries((arr || []).map((r) => [r.date, r]));
   const mn = byDate(minutes), pr = byDate(presser), ax = byDate(axis);
 
-  const series = daily.map((d) => d.index).filter((v) => v != null).slice(-30);
-  const last = daily[daily.length - 1];
+  // 통합 감성지수 = News : Fed = 1:1 (Fed 내부는 성명문:회의록:기자회견 = 1:1:1).
+  // 신뢰도는 그날 뉴스 표본으로 판정한다 — 통합값이 흔들리는 원인은 뉴스 쪽이기 때문.
+  const series = combined.map((d) => d.index).filter((v) => v != null).slice(-30);
+  const last = combined[combined.length - 1] || {};
+  const lastNews = daily.find((d) => d.date === last.date) || daily[daily.length - 1] || {};
   const rows = alerts.slice(-8).reverse();
 
   const m = market[market.length - 1];
@@ -79,7 +84,7 @@ export default function Home() {
 
   const mf = meta.minutes_finding, am = mf?.axis_means;
   const lastLabel = toneLabel(last.index);
-  const conf = confidenceLevel(last.n_articles, last.ci_lo, last.ci_hi);
+  const conf = confidenceLevel(lastNews.n_articles, lastNews.ci_lo, lastNews.ci_hi);
 
   return (
     <>
@@ -87,7 +92,7 @@ export default function Home() {
       <p className="sub">
         미국 연방준비제도(연준)의 성명문·회의록·기자회견과 경제뉴스를 같은 기준으로 분석해,
         연준의 어조가 낙관에 가까운지 우려에 가까운지 지수로 보여줍니다.
-        지수는 −1(비관)부터 +1(낙관) 사이의 값이며, 대체로 −0.3에서 +0.4 사이에서 움직입니다.
+        통합 지수는 과거 평균을 0으로 놓은 상대값이라, 양수면 그동안보다 낙관·음수면 우려 쪽입니다.
       </p>
 
       <div className="cols">
@@ -113,13 +118,17 @@ export default function Home() {
                 <b style={{ color: conf.color }}>{conf.label}</b>
                 <span style={{ opacity: 0.7 }}>· {conf.why}</span>
               </div>
+              <div className="sub2">
+                Fed <N v={last.fed} /> · 뉴스 <N v={last.news} /> 를 1:1 로 결합
+              </div>
               <div className="sub2">최근 {series.length}일 흐름</div>
             </div>
             <Spark values={series} />
           </div>
           <div className="note">
-            지수는 공개된 문서와 기사의 어조를 수치화한 것입니다. 시장 전망이나 투자 판단의
-            근거가 아닙니다.{" "}
+            연준 문서(성명문·회의록·기자회견을 같은 비중으로 합친 값)와 경제뉴스를 1:1 로
+            결합한 지수입니다. <b>0이 과거 평균</b>이고, 양수면 그동안보다 낙관, 음수면
+            우려 쪽이라는 뜻입니다. 시장 전망이나 투자 판단의 근거가 아닙니다.{" "}
             {conf.label === "낮음" && (
               <b>수집된 기사가 적은 날은 지수가 크게 흔들릴 수 있어 신호를 내지 않습니다.</b>
             )}
