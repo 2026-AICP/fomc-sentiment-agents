@@ -58,7 +58,7 @@ MINUTES_LAG_DAYS = 21   # 회의록 공개까지 걸리는 기간(약 3주)
 #   사후(post) : 발표 후 변화 = 조교 피드백의 "secondary outcome" → 종속변수
 # 조교 피드백: 사후 창은 "다음 회의까지"처럼 길게 잡지 말고 **짧은 것부터** 본다.
 D2Y_PRE_WINDOWS = (5, 20)
-D2Y_POST_WINDOWS = (1, 2, 5)
+D2Y_POST_WINDOWS = (1, 2, 3, 5)
 
 
 def classify(chg: float) -> str:

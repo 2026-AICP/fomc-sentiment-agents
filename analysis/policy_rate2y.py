@@ -94,6 +94,58 @@ def run_window(d: pd.DataFrame, w: int, rows: list) -> None:
         prev_r2 = res.rsquared
 
 
+def variant_grid(d: pd.DataFrame, rows: list) -> None:
+    """설계 변형 격자 — 후보를 **전부** 돌려 결과를 다 보여준다.
+
+    ★왜 격자를 다 싣는가: 여러 설계를 시험해 가장 좋은 하나만 보고하면 p값이
+      부풀려진다(다중비교). 선택 자체는 문제가 아니지만 **선택지를 숨기면** 문제가 된다.
+      그래서 전부 싣고, 고른 이유를 성능이 아닌 근거로도 댈 수 있는지 따로 적는다.
+
+    ★후보에서 회의록을 뺀 이유: 회의록은 회의 3주 뒤 공개된다. 회의 당일~2일 금리
+      반응을 회의록으로 설명하면 미래 정보를 쓰는 것이다(look-ahead). 성능이 좋게
+      나오더라도 쓸 수 없다 — 그래서 애초에 후보에 넣지 않는다.
+    """
+    import statsmodels.api as sm
+
+    tones = [
+        ("성명문", ["stmt"]),
+        ("성명문+기자회견", ["stmt", "presser_now"]),
+        ("뉴스(직전월)", ["news_pre"]),
+        ("성명문+뉴스", ["stmt", "news_pre"]),
+    ]
+    print("\n" + "=" * 62)
+    print("설계 변형 격자 — 전 조합 (선택 전 전체 공개)")
+    print("=" * 62)
+    print(f"  {'톤 구성':<18}{'창':>4}{'n':>6}{'ΔR²':>9}{'대표계수':>11}{'HAC p':>9}")
+    print("  " + "-" * 57)
+
+    for label, tcols in tones:
+        for w in (1, 2, 3, 5):
+            y_col = f"d2y_post{w}"
+            base = ["dec_Hike", "dec_Cut", "d2y_pre20"]
+            s = d.dropna(subset=base + tcols + [y_col])
+            if len(s) < 45:
+                continue
+            r0 = sm.OLS(s[y_col].astype(float),
+                        sm.add_constant(s[base].astype(float), has_constant="add")
+                        ).fit(cov_type="HAC", cov_kwds={"maxlags": HAC_LAGS})
+            r1 = sm.OLS(s[y_col].astype(float),
+                        sm.add_constant(s[base + tcols].astype(float), has_constant="add")
+                        ).fit(cov_type="HAC", cov_kwds={"maxlags": HAC_LAGS})
+            lead = tcols[0]
+            print(f"  {label:<18}{w:>4}{len(s):>6}{r1.rsquared - r0.rsquared:>+9.3f}"
+                  f"{r1.params[lead]:>+11.4f}{r1.pvalues[lead]:>9.3f}")
+            rows.append({"window_days": w, "model": f"변형: {label}", "n": len(s),
+                         "r2": round(r1.rsquared, 4),
+                         "delta_r2": round(r1.rsquared - r0.rsquared, 4),
+                         "tone_coef": round(float(r1.params[lead]), 5),
+                         "tone_p_hac": round(float(r1.pvalues[lead]), 4)})
+
+    print("\n  ※ 조합 16개를 전부 시험했다. 개별 p값은 다중비교 보정 전 값이므로,")
+    print("     하나를 골라 'p<0.05' 라고 말하려면 그 선택이 성능 외 근거로도")
+    print("     정당해야 한다 (조교 피드백: 짧은 창부터 볼 것).")
+
+
 def main():
     d = load()
     print("=" * 62)
@@ -104,6 +156,7 @@ def main():
     rows: list = []
     for w in WINDOWS:
         run_window(d, w, rows)
+    variant_grid(d, rows)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(OUT, index=False)
