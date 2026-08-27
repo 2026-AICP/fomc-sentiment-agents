@@ -1,0 +1,100 @@
+{
+  "computed_at": "2026-08-26",
+  "sample": {
+    "start": "2000-01-03",
+    "end": "2026-08-25",
+    "n_trading_days": 6701
+  },
+  "definition": {
+    "sided": "two",
+    "primary_horizon_days": 5,
+    "secondary_horizon_days": [
+      1,
+      3,
+      10
+    ],
+    "percentile": 90,
+    "rule": "|S&P 누적수익률| 또는 |ΔVIX| 가 90분위 초과면 적중"
+  },
+  "thresholds": {
+    "1": {
+      "n_days": 6700,
+      "thr_spx_abs_ret_pct": 1.7771,
+      "thr_vix_abs_chg_pt": 2.401,
+      "rate_spx": 0.1,
+      "rate_vix": 0.1,
+      "rate_union": 0.1443,
+      "rate_both": 0.0557
+    },
+    "3": {
+      "n_days": 6698,
+      "thr_spx_abs_ret_pct": 2.9839,
+      "thr_vix_abs_chg_pt": 3.93,
+      "rate_spx": 0.1,
+      "rate_vix": 0.0997,
+      "rate_union": 0.146,
+      "rate_both": 0.0537
+    },
+    "5": {
+      "n_days": 6696,
+      "thr_spx_abs_ret_pct": 3.7422,
+      "thr_vix_abs_chg_pt": 4.765,
+      "rate_spx": 0.1001,
+      "rate_vix": 0.1001,
+      "rate_union": 0.145,
+      "rate_both": 0.0551
+    },
+    "10": {
+      "n_days": 6691,
+      "thr_spx_abs_ret_pct": 4.9423,
+      "thr_vix_abs_chg_pt": 6.0,
+      "rate_spx": 0.1,
+      "rate_vix": 0.0998,
+      "rate_union": 0.1481,
+      "rate_both": 0.0517
+    }
+  },
+  "thresholds_ex_crisis": {
+    "excluded_years": [
+      2008,
+      2020
+    ],
+    "1": {
+      "n_days": 6194,
+      "thr_spx_abs_ret_pct": 1.6648,
+      "thr_vix_abs_chg_pt": 2.24,
+      "rate_spx": 0.1001,
+      "rate_vix": 0.0999,
+      "rate_union": 0.1451,
+      "rate_both": 0.0549
+    },
+    "3": {
+      "n_days": 6192,
+      "thr_spx_abs_ret_pct": 2.8469,
+      "thr_vix_abs_chg_pt": 3.73,
+      "rate_spx": 0.1001,
+      "rate_vix": 0.1001,
+      "rate_union": 0.146,
+      "rate_both": 0.0543
+    },
+    "5": {
+      "n_days": 6190,
+      "thr_spx_abs_ret_pct": 3.5721,
+      "thr_vix_abs_chg_pt": 4.56,
+      "rate_spx": 0.1,
+      "rate_vix": 0.0998,
+      "rate_union": 0.1454,
+      "rate_both": 0.0544
+    },
+    "10": {
+      "n_days": 6185,
+      "thr_spx_abs_ret_pct": 4.7437,
+      "thr_vix_abs_chg_pt": 5.7,
+      "rate_spx": 0.1001,
+      "rate_vix": 0.1001,
+      "rate_union": 0.1475,
+      "rate_both": 0.0527
+    }
+  },
+  "note": "한 번 고정하고 재계산하지 않는다. 평가 대상은 computed_at 이후 발송된 알림뿐이며, 그래야 임계값이 평가 대상보다 앞선 정보만 쓴다."
+}
