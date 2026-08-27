@@ -1,6 +1,6 @@
 # 피드백 반영 현황
 
-2026-08-27 / main `04f570e` / deploy `8ab9d3f`
+2026-08-27 기준 · `main` / `deploy/streamlit-dashboard` 동기화됨
 상세는 `docs/feedback_status.md`
 
 ## 교수님 (7월)
