@@ -146,6 +146,64 @@ def variant_grid(d: pd.DataFrame, rows: list) -> None:
     print("     정당해야 한다 (조교 피드백: 짧은 창부터 볼 것).")
 
 
+def expanding_oos(d: pd.DataFrame, w: int, rows: list, min_train: int = 80) -> None:
+    """확장 윈도우 표본 외 — 톤이 '이미 아는 정보' 위에 표본 외에서도 기여하는가.
+
+    primary(금리결정)와 같은 원칙: 각 회의를 그 이전 회의들로만 학습해 예측한다.
+    무작위 분할 금지(시계열).
+
+    ★연속 변수라 지표가 다르다. 정확도가 아니라 **표본 외 R²** 를 쓴다:
+        R²_oos = 1 - MSE(비교모형) / MSE(기준모형)
+      기준은 B1(결정 + 사전기대) 이다 — "이미 아는 것" 대비 톤의 증분을 보는 것이므로
+      단순 평균이 아니라 B1 을 기준으로 삼아야 질문과 맞는다.
+
+    ★중첩 모형 비교에는 Clark-West 를 쓴다. 일반 Diebold-Mariano 는 중첩 관계에서
+      검정 크기가 작아져(under-sized) 실제보다 보수적으로 나온다. Clark-West 는
+      큰 모형이 표본 외에서 필연적으로 겪는 추정오차 페널티를 보정한다:
+        f = e_r² - [e_u² - (yhat_r - yhat_u)²]
+      평균 f 가 0보다 유의하게 크면 큰 모형이 낫다. HAC 표준오차로 t 검정.
+    """
+    import statsmodels.api as sm
+
+    y_col = f"d2y_post{w}"
+    base = ["dec_Hike", "dec_Cut", "d2y_pre20"]
+    s = d.dropna(subset=base + ["stmt", y_col]).sort_values("date").reset_index(drop=True)
+    n = len(s)
+    if n <= min_train + 10:
+        print("\n표본이 확장 윈도우에 부족합니다.")
+        return
+
+    y = s[y_col].astype(float).values
+    er, eu, dhat = [], [], []
+    for i in range(min_train, n):
+        tr = s.iloc[:i]
+        for cols, store in ((base, er), (base + ["stmt"], eu)):
+            X = sm.add_constant(tr[cols].astype(float), has_constant="add")
+            fit = sm.OLS(tr[y_col].astype(float), X).fit()
+            xte = np.r_[1.0, s.iloc[i][cols].astype(float).values]
+            store.append(y[i] - float(fit.params.values @ xte))
+        dhat.append(er[-1] - eu[-1])          # yhat_u - yhat_r 과 부호만 다름
+
+    er, eu, dhat = np.array(er), np.array(eu), np.array(dhat)
+    mse_r, mse_u = float(np.mean(er ** 2)), float(np.mean(eu ** 2))
+    r2_oos = 1 - mse_u / mse_r
+
+    f = er ** 2 - (eu ** 2 - dhat ** 2)       # Clark-West 조정 손실차
+    Xc = sm.add_constant(np.ones(len(f)), has_constant="add")[:, :1]
+    cw = sm.OLS(f, Xc).fit(cov_type="HAC", cov_kwds={"maxlags": 4})
+    t_cw, p_cw = float(cw.tvalues[0]), float(cw.pvalues[0]) / 2   # 단측
+
+    print(f"\n[{w}거래일 반응]  확장 윈도우 표본 외 — 최초 학습 {min_train}건, "
+          f"예측 {len(er)}건 ({s.date.iloc[min_train].date()} ~ {s.date.iloc[-1].date()})")
+    print(f"  기준 B1(결정+사전기대) MSE  {mse_r:.6f}")
+    print(f"  비교 B2(+성명문 톤)    MSE  {mse_u:.6f}")
+    print(f"  표본 외 R²  {r2_oos:+.4f}   ({'개선' if r2_oos > 0 else '악화'})")
+    print(f"  Clark-West  t={t_cw:.2f}  p={p_cw:.3f} (단측)")
+    rows.append({"window_days": w, "model": "표본외 B1→B2", "n": len(er),
+                 "r2": None, "delta_r2": round(r2_oos, 5),
+                 "tone_coef": None, "tone_p_hac": round(p_cw, 4)})
+
+
 def main():
     d = load()
     print("=" * 62)
@@ -157,6 +215,12 @@ def main():
     for w in WINDOWS:
         run_window(d, w, rows)
     variant_grid(d, rows)
+
+    print("\n" + "=" * 62)
+    print("확장 윈도우 표본 외 검증")
+    print("=" * 62)
+    for w in WINDOWS:
+        expanding_oos(d, w, rows)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(OUT, index=False)
