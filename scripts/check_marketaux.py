@@ -1,6 +1,6 @@
-"""Marketaux 진단 — 유료 전환 판단용. 요청 8개만 쓴다.
+"""Marketaux 진단 — 유료 전환 판단용. 부분 실행 가능.
 
-두 가지를 확인한다 (약 26요청, 무료 한도 100/일):
+두 가지를 확인한다 (전체 약 36요청, 무료 한도 100/일):
   ① 과거 기사 접근 가능 여부 — 무료 키로 2022~2026 구간이 조회되는가?
      (백필이 가능한지, 아니면 플랜 제약인지 판별)
   ② group_similar 기본값(true)이 표본을 얼마나 줄이는가?
@@ -9,7 +9,12 @@
 Marketaux 대시보드(로그인 → API key)에서 받아 저장소 루트에 .newsapi_key 로 두면 된다.
 (.newsapi_key 는 gitignore 대상)
 
-실행:  python scripts/check_marketaux.py
+실행:  python scripts/check_marketaux.py           # 전체 (약 36요청)
+       python scripts/check_marketaux.py history   # ① 만 (6요청)
+       python scripts/check_marketaux.py group     # ② 만 (약 30요청)
+
+★매일 07:00 KST 자동화가 최대 80요청을 쓴다. 남는 여유가 20 남짓이라 전체 실행이
+  안 들어갈 수 있다. 한도는 UTC 자정에 초기화된다.
 """
 import json
 import os
@@ -67,7 +72,18 @@ def _page(key, after, before=None, group_similar=None, page=1, limit=3):
     d = _get(params)
     if "error" in d:
         e = d["error"]
-        return None, None, f"{e.get('code', '?')} — {str(e.get('message', ''))[:70]}"
+        code = str(e.get("code", "?"))
+        # 쿼터 소진은 더 물어봐야 소용없다. 빈 데이터로 결론을 내는 것이 가장 나쁘므로
+        # 즉시 중단시킨다 — 실제로 한 번 "요청 0건 성공"인데 판정문이 찍힌 적이 있다.
+        if "usage_limit" in code or "quota" in code.lower():
+            sys.exit(
+                "\n[중단] 오늘 API 요청 한도를 다 썼습니다 (무료 100/일).\n"
+                "  매일 07:00 KST 자동화가 최대 80요청을 쓰므로, 진단에 쓸 수 있는 여유는\n"
+                "  20요청 남짓입니다. 한도는 UTC 자정에 초기화됩니다.\n"
+                "  · 이미 확인된 것: 과거 기사 접근 가능(①)\n"
+                "  · 남은 것: group_similar 대조 측정(②) — `python scripts/check_marketaux.py group`\n"
+                "    (②만 돌리면 30요청. 그래도 부족하면 유료 전환 후 확인해도 됩니다)")
+        return None, None, f"{code} — {str(e.get('message', ''))[:70]}"
     return (d.get("meta") or {}).get("found"), d.get("data", []), None
 
 
@@ -95,40 +111,10 @@ def collect_urls(key, after, group_similar, pages=10, limit=3):
     return urls, times, n_req
 
 
-def main():
-    key = api_key()
-
-    print("=" * 66)
-    print("① 과거 기사 접근 — 무료 키로 어디까지 조회되나")
-    print("=" * 66)
-    print("  각 구간 7일치의 매칭 건수(meta.found)를 본다.\n")
-    windows = [("2022-06-01", "2022-06-08"), ("2023-06-01", "2023-06-08"),
-               ("2024-06-01", "2024-06-08"), ("2025-06-01", "2025-06-08"),
-               ("2026-01-06", "2026-01-13")]
-    hist_ok = 0
-    for a, b in windows:
-        found, err = probe(key, f"{a}T00:00", f"{b}T00:00")
-        if err:
-            print(f"  {a} ~ {b}   오류: {err}")
-        else:
-            mark = "접근 가능" if found else "0건 — 데이터 없음/차단"
-            print(f"  {a} ~ {b}   {str(found):>6}건   {mark}")
-            if found:
-                hist_ok += 1
-
+def section_group(key):
+    """② group_similar 대조 측정만 — 약 30요청."""
+    from datetime import datetime, timedelta, timezone
     recent = (datetime.now(timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M")
-    found_now, _ = probe(key, recent)
-    print(f"\n  (대조) 최근 3일           {str(found_now):>6}건")
-
-    print("\n  판정:", end=" ")
-    if hist_ok >= 3:
-        print("과거 접근 **가능**. 백필은 요청 수 문제이므로 유료 전환으로 해결된다.")
-    elif hist_ok == 0 and found_now:
-        print("과거 **조회 불가**(최근은 됨) — 플랜 제약일 가능성.")
-        print("        유료로 열리는지 Marketaux 지원팀에 문의 후 결제하세요.")
-    else:
-        print("판별 실패 — 키·네트워크를 확인하세요.")
-
     print("\n" + "=" * 66)
     print("② group_similar 기본값(true)이 표본을 얼마나 줄이나")
     print("=" * 66)
@@ -165,7 +151,10 @@ def main():
         print("    회수 범위: false 가 더 짧은 기간을 채웠다 → 묶임의 방증")
 
     print()
-    if effect > noise * 2 and effect >= 5 or denser:
+    if not (u_on and u_ctl and u_off):
+        # 세 호출 중 하나라도 비면 비교가 성립하지 않는다. 결론을 내지 않는다.
+        print("  → 판별 불가 — 회수된 기사가 없습니다(요청 한도·네트워크 확인).")
+    elif effect > noise * 2 and effect >= 5 or denser:
         print("  → 묶임 효과 있음. 전수 회수 시 표본이 늘어난다.")
         for u in sorted(s_off - s_on)[:5]:
             print(f"      예: {u[:88]}")
@@ -174,6 +163,57 @@ def main():
         print("     (조용한 시기일 수 있으니 FOMC·잭슨홀 같은 기사 폭증일에 재확인)")
     else:
         print("  → 판별 애매. 노이즈보다 크지만 결정적이지 않다. 기사 폭증일에 재확인.")
+
+
+
+def main():
+    key = api_key()
+    # 부분 실행 — 무료 한도(100/일)에서 매일 자동화가 최대 80을 쓰므로 전체(36요청)가
+    # 안 들어갈 때가 있다. 필요한 절만 돌릴 수 있게 한다.
+    part = sys.argv[1] if len(sys.argv) > 1 else "all"
+    if part not in ("all", "history", "group"):
+        sys.exit("사용법: python scripts/check_marketaux.py [all|history|group]")
+
+    if part == "group":
+        section_group(key)
+        return
+
+    print("=" * 66)
+    print("① 과거 기사 접근 — 무료 키로 어디까지 조회되나")
+    print("=" * 66)
+    print("  각 구간 7일치의 매칭 건수(meta.found)를 본다.\n")
+    windows = [("2022-06-01", "2022-06-08"), ("2023-06-01", "2023-06-08"),
+               ("2024-06-01", "2024-06-08"), ("2025-06-01", "2025-06-08"),
+               ("2026-01-06", "2026-01-13")]
+    hist_ok = 0
+    for a, b in windows:
+        found, err = probe(key, f"{a}T00:00", f"{b}T00:00")
+        if err:
+            print(f"  {a} ~ {b}   오류: {err}")
+        else:
+            mark = "접근 가능" if found else "0건 — 데이터 없음/차단"
+            print(f"  {a} ~ {b}   {str(found):>6}건   {mark}")
+            if found:
+                hist_ok += 1
+
+    recent = (datetime.now(timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M")
+    found_now, _ = probe(key, recent)
+    print(f"\n  (대조) 최근 3일           {str(found_now):>6}건")
+
+    print("\n  판정:", end=" ")
+    n_tested = sum(1 for _ in windows)
+    if hist_ok >= 3:
+        print("과거 접근 **가능**. 백필은 요청 수 문제이므로 유료 전환으로 해결된다.")
+    elif hist_ok == 0 and found_now:
+        print("과거 **조회 불가**(최근은 됨) — 플랜 제약일 가능성.")
+        print("        유료로 열리는지 Marketaux 지원팀에 문의 후 결제하세요.")
+    else:
+        # 데이터가 모자라면 결론을 내지 않는다 — 빈 결과로 판정문을 찍는 것이 최악이다
+        print(f"판별 불가 — {n_tested}개 구간 중 {hist_ok}개만 확인됐습니다.")
+        print("        키·네트워크·요청 한도를 확인한 뒤 다시 실행하세요.")
+
+    section_group(key)
+
 
     print(f"\n※ 총 {6 + r0 + r1 + r2}요청 사용 (무료 한도 100/일).")
 
