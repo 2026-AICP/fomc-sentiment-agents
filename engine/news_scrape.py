@@ -8,7 +8,14 @@ FOMC 성명문(engine/scrape.py)과 짝을 이루는 "News 축" 수집 도구.
   · 저장소 루트의 .newsapi_key 파일 (gitignore됨)
 
 Marketaux 무료 티어: 하루 100요청 · 요청당 3건 · 최근 기사 위주(실시간용).
-  → 한 번 실행에 pages*3건 수집 (기본 5쪽=15건). 과거·대량은 유료 전환.
+  → 한 번 실행에 pages*3건 수집 (자동화 기본 80쪽=240건). 과거·대량은 유료 전환.
+
+★표본추출(2026-08 지도교수 피드백 반영) — 아래 상수에 명시돼 있다:
+  · 정렬은 최신순 고정(SORT). 랜덤 정렬은 API 가 제공하지 않는다.
+  · 중복 묶음(GROUP_SIMILAR)은 상수로 뽑아뒀고 현재는 API 기본값(true)과 같다 —
+    끄는 것은 유료 전환과 함께 결정하기로 보류. 상세는 상수 주석 참조.
+  전수 회수가 되면 정렬·절단 문제가 모두 사라진다. Basic($24/월, 요청당 20건) 전환 시
+  3일 창 풀(약 292건)을 15요청이면 다 받는다 → PER_PAGE 를 20 으로 올리면 된다.
 검증(과거 대량)은 WSJ, 운영(실시간)은 이 도구 — 소스 분리 원칙.
 Marketaux 자체 감성점수는 쓰지 않는다 → 우리 보정 FinBERT로 직접 산출.
 
@@ -36,7 +43,33 @@ ENDPOINT = "https://api.marketaux.com/v1/news/all"
 #   bernanke, ECB 등)만 가진 기사를 놓친다. F 만 거는 건 필터의 필수조건과 같아서 손실이 없다.
 #   정밀 규칙(F그룹 AND M그룹)은 그대로 is_relevant 가 적용한다 (지도교수 세트, 2026-07).
 QUERY = '"federal reserve" | fed'
-PER_PAGE = 3            # 무료 티어 상한(요청당 3건). 유료면 상향 가능.
+PER_PAGE = 3            # 무료 티어 상한(요청당 3건). Basic=20 · Standard=50 로 상향 가능.
+
+# ── 표본추출 옵션 — 기본값에 기대지 않고 명시한다 (2026-08 지도교수 피드백) ──
+# "검색 순서가 순서대로인지 랜덤인지 확인" 지적에 대한 답을 코드에 박아둔다.
+#
+# ★정렬: Marketaux 는 sort 를 안 보내면 published_on desc(최신순)가 기본이다.
+#   기본값에 기대면 API 가 기본값을 바꿀 때 표본추출 방식이 조용히 달라지므로 명시한다.
+#   랜덤 정렬은 제공하지 않는다(옵션: published_on · entity_match_score ·
+#   entity_sentiment_score · relevance_score). relevance_score 는 쓰지 않는다 —
+#   용량이 모자라 잘릴 때 관련도 높은 것만 남아 표본이 더 편향된다.
+#   최신순 + 겹치는 창(days_back=3)이면 기사는 발행 당일 목록 맨 위에 있어 회수된다.
+SORT = "published_on"
+SORT_ORDER = "desc"
+
+# ★중복 묶음: group_similar 는 **기본값이 true** 라, 지금까지 API 가 "같은 주제"라고
+#   판단한 기사를 말없이 묶어서 하나만 보내고 있었다. 두 가지가 어긋난다:
+#     (1) 우리는 기사 수를 세는데 실제로는 주제 수를 세게 된다. 비슷한 기사가 쏟아지는
+#         큰 이벤트(FOMC·잭슨홀)일수록 표본이 상대적으로 얇아진다.
+#     (2) 묶여서 안 온 기사는 rejected_news.csv 에도 안 남아 **감사 자체가 불가능**하다.
+#   그래서 끄고, 중복 제거는 우리 규칙(URL 일치)으로 직접 한다 — 기준이 문서에 남고
+#   몇 건을 지웠는지 셀 수 있다.
+#   ※ 아직 끄지 않았다 — 현재 값은 API 기본값(true)과 같아 **동작 변화가 없다.**
+#     무료 티어에서 끄면 풀이 커지는데 회수 용량(pages*3=240)은 그대로라 절단이 늘 수
+#     있어, 유료 전환(Basic: 요청당 20건 → 3일 창 292건을 15요청에 전수 회수)과 함께
+#     결정하기로 했다. 전환 시 아래를 False 로 바꾸고 PER_PAGE 를 20 으로 올리면 된다.
+#     상수로 뽑아둔 이유가 그것이다 — 결정되면 한 줄만 고치면 된다.
+GROUP_SIMILAR = True
 OUT = ROOT / "data" / "news" / "fed_news.csv"
 
 # ── 뉴스 선정 = 지도교수 키워드 세트(2026-07): F그룹 AND M그룹 (각 1개 이상 언급) ──
@@ -85,19 +118,35 @@ def _one_page(key, from_date, page):
         "published_after": from_date,   # ISO (YYYY-MM-DDTHH:MM)
         "limit": PER_PAGE,
         "page": page,
+        "sort": SORT,                   # 기본값 의존 제거 (위 상수 주석 참조)
+        "sort_order": SORT_ORDER,
+        "group_similar": "true" if GROUP_SIMILAR else "false",
     }
     try:
         r = requests.get(ENDPOINT, params=params, timeout=20)
     except requests.RequestException as e:
         # 예외 메시지에 URL(=토큰) 노출 방지 → 유형만 보고 (from None 로 원인 체인 차단)
-        raise RuntimeError(f"네트워크 오류: {type(e).__name__}") from None
+        raise ApiError(f"네트워크 오류: {type(e).__name__}") from None
     data = r.json() if r.content else {}
     if r.status_code != 200 or (isinstance(data, dict) and "error" in data):
         err = data.get("error", {}) if isinstance(data, dict) else {}
+        code = str(err.get("code", "?"))
+        # 429 = 속도제한 → Retry-After 를 존중해 그만큼 쉬고 재시도한다.
+        if r.status_code == 429 or "rate" in code.lower():
+            ra = r.headers.get("Retry-After")
+            try:
+                wait = float(ra) if ra else RATE_LIMIT_WAIT
+            except ValueError:
+                wait = RATE_LIMIT_WAIT
+            raise ApiError(f"속도제한(429) — {wait:.0f}초 대기", status=429, retry_after=wait)
+        # 키 오류·쿼터 소진은 재시도해도 소용없다 → 즉시 중단시킨다.
+        if r.status_code in (401, 402, 403) or "usage_limit" in code or "quota" in code.lower():
+            raise ApiError(f"복구 불가 (HTTP {r.status_code}): {code} — {err.get('message', '')}",
+                           status=r.status_code, terminal=True)
         # 키(api_token)를 노출하지 않는 안전한 에러 메시지 (URL 미출력)
-        raise RuntimeError(
+        raise ApiError(
             f"Marketaux 실패 (HTTP {r.status_code}): "
-            f"{err.get('code', '?')} — {err.get('message', '')}"
+            f"{code} — {err.get('message', '')}"
         )
     arts = []
     for a in data.get("data", []):
@@ -116,6 +165,32 @@ def _one_page(key, from_date, page):
 
 
 MAX_FAIL_STREAK = 3     # 연속 실패가 이만큼이면 API 이상으로 보고 중단
+
+# ── 요청 간격 (2026-08: 이격이 짧아 실패하는 사례 확인) ──────────────────────
+# 기존엔 페이지 사이 0.4초 고정이었다. 80쪽이면 초당 2.5요청이라 무료 티어 속도제한에
+# 걸린다. 게다가 429(제한 초과)와 일시 네트워크 오류를 같은 예외로 처리해, 제한에
+# 걸렸을 때도 0.8초만 쉬고 다시 때려 상황을 악화시켰다.
+#   · 기본 간격을 늘리고
+#   · 429 를 따로 식별해 Retry-After 를 존중하며
+#   · 한 번이라도 429 가 나면 그 실행 동안 간격을 올려 재발을 막는다(적응형)
+BASE_DELAY = 1.1        # 페이지 사이 기본 간격(초). 80쪽 ≈ 88초 — 자동화에 무리 없음
+DELAY_STEP = 0.6        # 429 를 만날 때마다 이만큼 가산
+MAX_DELAY = 5.0
+RATE_LIMIT_WAIT = 8.0   # Retry-After 헤더가 없을 때 429 기본 대기(초)
+
+
+class ApiError(RuntimeError):
+    """Marketaux 오류 — 재시도 가능 여부와 대기 시간을 함께 들고 다닌다.
+
+    terminal=True 는 재시도해도 소용없는 것(키 오류·일일 쿼터 소진)이다.
+    이걸 구분하지 않으면 쿼터가 끝난 뒤에도 재시도 3회 × 남은 페이지만큼 헛되이 때린다.
+    """
+
+    def __init__(self, msg, status=None, retry_after=None, terminal=False):
+        super().__init__(msg)
+        self.status = status
+        self.retry_after = retry_after
+        self.terminal = terminal
 
 
 def discover_news(days_back=3, pages=5, retries=2):
@@ -138,16 +213,33 @@ def discover_news(days_back=3, pages=5, retries=2):
     from_dt = datetime.now(timezone.utc) - timedelta(days=days_back)
     from_date = from_dt.strftime("%Y-%m-%dT%H:%M")
     out, found, skipped, streak = [], None, 0, 0
+    delay = BASE_DELAY          # 429 를 만나면 이 실행 동안 계속 올린다(적응형)
+    n_429 = 0
     for p in range(1, pages + 1):
-        arts, last = None, ""
+        arts, last, terminal = None, "", False
         for attempt in range(retries + 1):
             try:
                 arts, found = _one_page(key, from_date, p)
                 break
+            # ApiError 가 아니라 부모인 RuntimeError 를 잡는다 — 우리 코드는 ApiError 를
+            # 던지지만, 이 함수를 감싸는 다른 호출부·테스트가 평범한 RuntimeError 를
+            # 던질 수 있다. 부모를 잡고 추가 정보는 getattr 로 선택적으로 읽는 편이
+            # 안전하다(ApiError 만 잡으면 일반 RuntimeError 가 그대로 터져 나간다).
             except RuntimeError as e:
                 last = str(e)[:45]
-                if attempt < retries:
+                if getattr(e, "terminal", False):            # 키·쿼터 → 재시도 무의미
+                    terminal = True
+                    break
+                if getattr(e, "status", None) == 429:        # 속도제한 → 간격을 올린다
+                    n_429 += 1
+                    delay = min(delay + DELAY_STEP, MAX_DELAY)
+                    if attempt < retries:
+                        time.sleep(getattr(e, "retry_after", None) or RATE_LIMIT_WAIT)
+                elif attempt < retries:
                     time.sleep(0.8 * (attempt + 1))          # 지수 backoff 후 재시도
+        if terminal:
+            print(f"  ⚠ {last} — 재시도 무의미, 중단 (지금까지 {len(out)}건 유지)")
+            break
         if arts is None:                                     # 재시도 소진 → 이 페이지만 포기
             skipped += 1
             streak += 1
@@ -161,9 +253,12 @@ def discover_news(days_back=3, pages=5, retries=2):
         if not arts:                                         # 빈 페이지 = 결과 소진 → 정상 종료
             break
         out.extend(arts)
-        time.sleep(0.4)                                      # 폴라이트(무료 티어 속도제한 여유)
+        time.sleep(delay)                                    # 적응형 간격(429 만나면 증가)
     if skipped:
         print(f"  ⚠ 건너뛴 페이지 {skipped}쪽 — 최대 {skipped * PER_PAGE}건 놓침")
+    if n_429:
+        print(f"  ⚠ 속도제한 {n_429}회 — 간격을 {delay:.1f}초로 올렸습니다. "
+              f"반복되면 BASE_DELAY 를 높이거나 유료 전환을 검토하세요.")
     return out, found
 
 
@@ -219,9 +314,18 @@ def collect(days_back=3, pages=5, out=OUT):
     #   받음 ≫ 통과      이면 → F∧M 필터가 좁은 것
     #   통과 ≫ 신규      이면 → 이미 가진 기사(중복) — 창이 겹쳐 새 기사가 적은 것
     rate = f"{len(articles) / len(raw):.0%}" if raw else "-"
+    # 회수율 = 받음/매칭. group_similar 를 끈 뒤로는 풀이 커져 이 값이 떨어질 수 있다.
+    # 무료 티어에서 절단이 얼마나 일어나는지 한눈에 보라고 따로 뽑는다.
+    cover = (len(raw) / found) if isinstance(found, int) and found else None
+    cov_s = f"회수율 {cover:.0%}" if cover is not None else "회수율 ?"
     print(f"  [수집 진단] API 매칭 {found if found is not None else '?'}건 → 받음 {len(raw)}건 "
-          f"→ F∧M 통과 {len(articles)}건({rate}, 탈락기록 {n_rej}건) "
+          f"({cov_s}) → F∧M 통과 {len(articles)}건({rate}, 탈락기록 {n_rej}건) "
           f"→ 신규 저장 {len(new)}건(중복 {len(articles) - len(new)}건)")
+    if cover is not None and cover < 0.9:
+        miss = found - len(raw)
+        print(f"  ⚠ 풀의 {miss}건을 회수하지 못했습니다(용량 상한 {pages * PER_PAGE}건). "
+              f"최신순이라 창에서 가장 오래된 기사부터 잘립니다 — "
+              f"겹치는 창이 대부분 회복하지만, 유료 전환 시 완전히 사라지는 문제입니다.")
     return articles, new, found
 
 
