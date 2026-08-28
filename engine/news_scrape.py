@@ -99,7 +99,9 @@ def _api_key():
     if not key:
         kf = ROOT / ".newsapi_key"
         if kf.exists():
-            key = kf.read_text(encoding="utf-8").strip()
+            # utf-8-sig: 메모장·PowerShell 로 만든 키 파일은 BOM 이 붙는데, 그냥 utf-8 로
+            # 읽으면 BOM 이 키 앞에 남아 인증이 실패한다(.strip() 으로도 안 지워진다).
+            key = kf.read_text(encoding="utf-8-sig").strip().strip('"').strip("'")
     if not key:
         raise RuntimeError(
             "뉴스 API 키가 없습니다. 환경변수 NEWS_API_KEY 를 설정하거나 "
