@@ -84,14 +84,15 @@ def collect_urls(key, after, group_similar, pages=10, limit=3):
       개수일 가능성이 크고, 실제로 두 설정에서 같은 값이 나왔다. 파라미터가 바꾸는
       것은 '반환되는 기사'이므로 반환분을 직접 세야 한다.
     """
-    urls, n_req = [], 0
+    urls, times, n_req = [], [], 0
     for p in range(1, pages + 1):
         _, arts, err = _page(key, after, None, group_similar, page=p, limit=limit)
         n_req += 1
         if err or not arts:
             break
         urls += [a.get("url", "") for a in arts if a.get("url")]
-    return urls, n_req
+        times += [a.get("published_at", "") for a in arts if a.get("published_at")]
+    return urls, times, n_req
 
 
 def main():
@@ -138,19 +139,29 @@ def main():
 
     # found 로는 판별이 안 되므로 실제 반환분을 센다
     PAGES = 10
-    u_on, r1 = collect_urls(key, recent, True, pages=PAGES)
-    u_off, r2 = collect_urls(key, recent, False, pages=PAGES)
+    u_on, t_on, r1 = collect_urls(key, recent, True, pages=PAGES)
+    u_off, t_off, r2 = collect_urls(key, recent, False, pages=PAGES)
     s_on, s_off = set(u_on), set(u_off)
     print(f"\n  실제 반환 ({PAGES}쪽까지 회수)")
-    print(f"    true  : {len(u_on):>4}건 (고유 {len(s_on)})")
-    print(f"    false : {len(u_off):>4}건 (고유 {len(s_off)})")
-    only_off = s_off - s_on
-    print(f"    false 에서만 나온 기사: {len(only_off)}건")
-    if len(s_off) > len(s_on) or only_off:
+    print(f"    true  : {len(u_on):>4}건 (고유 {len(s_on)})  가장 오래된 {min(t_on) if t_on else '-'}")
+    print(f"    false : {len(u_off):>4}건 (고유 {len(s_off)})  가장 오래된 {min(t_off) if t_off else '-'}")
+    only_off = sorted(s_off - s_on)
+    only_on = s_on - s_off
+    print(f"    false 에서만 나온 기사: {len(only_off)}건 / true 에서만: {len(only_on)}건")
+
+    # ★판별 근거 두 가지
+    #   (1) false 에만 있는 기사 = 묶여서 빠졌던 기사
+    #   (2) 같은 건수를 받았는데 false 가 '덜 과거까지' 왔다면, 그만큼 최근 구간에
+    #       기사가 더 촘촘히 있었다는 뜻 = 묶임이 있었다는 신호
+    denser = bool(t_on and t_off and min(t_off) > min(t_on))
+    if only_off or denser:
         print("  → 묶임이 실제로 기사를 걸러내고 있다. 전수 회수 시 표본이 늘어난다.")
+        for u in only_off[:5]:
+            print(f"      예: {u[:88]}")
     else:
-        print("  → 같은 기사들이 돌아왔다. 이 구간에선 묶임 효과가 없다"
-              " (다른 시기·이벤트일엔 다를 수 있음).")
+        print("  → 같은 기사들이 같은 범위로 돌아왔다. 이 구간에선 묶임 효과가 없다.")
+        print("     (조용한 시기일 수 있으니 FOMC·잭슨홀 같은 기사 폭증일에 한 번 더 확인)")
+    print("     ※ 두 호출 사이에 새 기사가 들어오면 1~2건 차이는 날 수 있다.")
 
     print(f"\n※ 총 {6 + r1 + r2}요청 사용 (무료 한도 100/일).")
 
