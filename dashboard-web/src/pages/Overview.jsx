@@ -6,6 +6,7 @@ export default function Overview() {
   const { data: meetings } = useJson("meetings");
   const { data: daily } = useJson("daily_signals");
   const { data: news } = useJson("news_daily");
+  const { data: combined } = useJson("daily_headline");
   const { data: alerts } = useJson("alerts");
   if (!meetings || !alerts) return <div className="loading">데이터를 불러오는 중입니다.</div>;
 
@@ -45,9 +46,9 @@ export default function Overview() {
           meta={lastAlert.date} />
       </div>
 
-      <h2 className="sec">성명문 톤 추이 (2000년 이후)</h2>
-      <Panel cap="회의 220건의 성명문을 문장 단위로 채점한 뒤, 확신이 높은 문장에 더 큰 비중을 두어 평균했습니다.">
-        <IndexArea data={meetings} y="tone" />
+      <h2 className="sec">통합 감성지수 추이 (일별)</h2>
+      <Panel cap="연준 문서(성명문·회의록·기자회견 1:1:1)와 경제뉴스를 1:1로 결합한 일별 지수입니다. 0이 과거 평균이며, 문서별 톤은 FOMC 탭에서 볼 수 있습니다.">
+        <IndexArea data={combined || []} y="index" color="var(--accent)" />
       </Panel>
 
       <h2 className="sec">최근 회의 신호</h2>

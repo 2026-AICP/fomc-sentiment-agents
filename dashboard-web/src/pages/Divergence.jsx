@@ -9,7 +9,7 @@ const CASES = [
   { date: "2011-08-09", ctx: "미국 신용등급 강등 직후", fed: "−0.05 (우려)", mkt: "주가 +4.7%" },
 ];
 
-export default function Divergence() {
+export default function Divergence({ embedded = false }) {
   const { data: meta } = useJson("meta");
   if (!meta) return <div className="loading">데이터를 불러오는 중입니다.</div>;
   const dv = meta.divergence;
@@ -20,11 +20,17 @@ export default function Divergence() {
 
   return (
     <>
-      <h1>괴리 신호 검증</h1>
-      <p className="sub">
-        연준의 어조와 시장 반응이 서로 반대로 움직인 회의를 괴리라고 부릅니다.
-        위기를 예측하는 지표가 아니라, 자세히 살펴볼 시점을 표시하는 알림입니다.
-      </p>
+      {embedded ? (
+        <h2 className="sec">대표 괴리 사례</h2>
+      ) : (
+        <h1>괴리 신호 검증</h1>
+      )}
+      {!embedded && (
+        <p className="sub">
+          연준의 어조와 시장 반응이 서로 반대로 움직인 회의를 괴리라고 부릅니다.
+          위기를 예측하는 지표가 아니라, 자세히 살펴볼 시점을 표시하는 알림입니다.
+        </p>
+      )}
 
       <Panel title="괴리란 무엇인가요?">
         연준의 <b>어조</b>와 시장의 <b>반응</b>이 서로 <b style={{ color: "var(--dn)" }}>엇갈린</b> 회의입니다.

@@ -1,5 +1,6 @@
 import { useJson } from "../lib/data";
 import { Kpi, Panel } from "../components/ui";
+import Divergence from "./Divergence";
 
 export default function Method() {
   const { data: meta } = useJson("meta");
@@ -59,6 +60,8 @@ export default function Method() {
         기자회견은 2011년 4월부터 도입되어 그 이전 회의에는 없습니다. 회의록은 회의 약 3주
         뒤에 공개되므로, 최근 회의는 공개 전까지 회의록 없이 집계됩니다.
       </div>
+
+      <Divergence embedded />
     </>
   );
 }
