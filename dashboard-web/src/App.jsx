@@ -5,9 +5,7 @@ import Overview from "./pages/Overview";
 import Signals from "./pages/Signals";
 import News from "./pages/News";
 import Market from "./pages/Market";
-import Divergence from "./pages/Divergence";
-import Presser from "./pages/Presser";
-import Minutes from "./pages/Minutes";
+import Fomc from "./pages/Fomc";
 import Method from "./pages/Method";
 
 // 상단 가로 내비 — 경제정보 사이트 구조(좌측 사이드바 아님).
@@ -15,12 +13,10 @@ import Method from "./pages/Method";
 const PAGES = [
   { key: "home", label: "홈", el: <Home /> },
   { key: "overview", label: "감성지수", el: <Overview /> },
-  { key: "minutes", label: "회의록", el: <Minutes /> },
-  { key: "presser", label: "기자회견", el: <Presser /> },
+  { key: "fomc", label: "FOMC", el: <Fomc /> },
   { key: "signals", label: "신호", el: <Signals /> },
   { key: "news", label: "뉴스", el: <News /> },
   { key: "market", label: "시장지표", el: <Market /> },
-  { key: "divergence", label: "괴리 검증", el: <Divergence /> },
   { key: "method", label: "방법론", el: <Method /> },
 ];
 
