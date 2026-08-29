@@ -79,7 +79,7 @@ export default function Home() {
     ["VIX 변동성", ...pick("vix", "vix_chg"), "지수", ""],
     ["미 국채 2년", ...pick("ust2y"), "%", "%p"],
     ["미 국채 10년", ...pick("ust10y"), "%", "%p"],
-    ["장단기 스프레드", ...pick("spread"), "%p", "%p"],
+    ["장단기 금리차", ...pick("spread"), "%p", "%p"],
   ];
 
   const mf = meta.minutes_finding, am = mf?.axis_means;
@@ -209,7 +209,7 @@ export default function Home() {
             <tbody>
               {indicators.map(([n, v, c, u, s]) => (
                 <tr key={n}>
-                  <td>{n}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{n}</td>
                   <td className="r"><span className="num">
                     {v == null ? <span className="na">—</span>
                       : v.toLocaleString(undefined, { minimumFractionDigits: 2 })}
