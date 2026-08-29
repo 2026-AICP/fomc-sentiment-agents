@@ -52,7 +52,7 @@ function Ticker() {
     { n: "VIX", ...field("vix", { chgKey: "vix_chg" }), s: "" },
     { n: "미 국채 2년", ...field("ust2y", { suffix: "%" }), s: "%p" },
     { n: "미 국채 10년", ...field("ust10y", { suffix: "%" }), s: "%p" },
-    { n: "장단기 스프레드", ...field("spread", { suffix: "%p" }), s: "%p" },
+    { n: "장단기 금리차", ...field("spread", { suffix: "%p" }), s: "%p" },
   ];
   return (
     <div className="ticker">

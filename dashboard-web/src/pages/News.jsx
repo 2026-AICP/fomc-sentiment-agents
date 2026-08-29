@@ -1,13 +1,16 @@
+import { useState } from "react";
 import { useJson, fmt, confidenceLevel } from "../lib/data";
 import { Panel } from "../components/ui";
 import { IndexArea } from "../components/charts";
 
 export default function News() {
   const { data: news } = useJson("news_daily");
+  const [showAll, setShowAll] = useState(false);   // 일별 표: 기본 최근 7일
   if (!news) return <div className="loading">데이터를 불러오는 중입니다.</div>;
   if (!news.length) return <div className="loading">아직 수집된 뉴스 지수가 없습니다.</div>;
 
   const rows = news.slice().reverse();
+  const visible = showAll ? rows : rows.slice(0, 7);
 
   return (
     <>
@@ -28,7 +31,7 @@ export default function News() {
             <tr><th>일자</th><th className="r">지수</th><th className="r">기사 수</th><th>신뢰도</th></tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {visible.map((r) => {
               const c = confidenceLevel(r.n_articles, r.ci_lo, r.ci_hi);
               return (
                 <tr key={r.date}>
@@ -41,6 +44,14 @@ export default function News() {
             })}
           </tbody>
         </table>
+        {rows.length > 7 && (
+          <button type="button" onClick={() => setShowAll(!showAll)}
+            style={{ width: "100%", padding: "9px 0", marginTop: 2, cursor: "pointer",
+                     background: "none", border: "none", borderTop: "1px solid var(--line)",
+                     color: "var(--accent)", font: "inherit", fontWeight: 600 }}>
+            {showAll ? "접기" : `더보기 (전체 ${rows.length}일)`}
+          </button>
+        )}
       </div>
       <div className="note">
         신뢰도는 그날 모인 기사 수와 기사 간 어조가 얼마나 일치하는지로 판단합니다.

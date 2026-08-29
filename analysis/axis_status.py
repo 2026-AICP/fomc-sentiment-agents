@@ -67,20 +67,41 @@ def axis_state(date: str):
     return have, exp, sum(1 for a in exp if have[a]), len(exp)
 
 
-def pending_meetings(months=DEFAULT_MONTHS):
-    """최근 N개월 회의 중 **아직 3축이 다 안 찬** 날짜 — 매일 재방문 대상.
+def finalized_dates(db=DB):
+    """확정판(fed_composite_final)이 기록된 회의일 집합. DB 없으면 None."""
+    if not pathlib_exists(db):
+        return None
+    con = sqlite3.connect(db)
+    try:
+        return {r[0] for r in con.execute(
+            "SELECT date FROM meetings "
+            "WHERE method='fed_composite_final' AND granularity='meeting'")}
+    finally:
+        con.close()
 
-    이미 완성된 회의는 제외해 매일 불필요한 재처리를 막는다.
+
+def pathlib_exists(p):
+    return Path(p).exists()
+
+
+def pending_meetings(months=DEFAULT_MONTHS):
+    """최근 N개월 회의 중 **확정판(3축 결합)이 아직 기록되지 않은** 날짜 — 매일 재방문 대상.
+
+    ★판정 기준 교체(2026-08): '파일이 다 수집됐는가' → '확정판이 DB 에 기록됐는가'.
+    파일 기준의 결함: 회의록 **파일**이 도착한 아침, 수집 단계(run_news_daily ⓪-b)가
+    에이전트 단계(③)보다 먼저 돌아 그 회의를 '완성'으로 바꿔 버린다 — 그 순간 재방문
+    목록에서 빠져, 정작 톤 산출과 3축 결합은 영영 실행되지 않는다.
+    (실제 사고: 2026-07-29 — minutes 파일은 있는데 minutes_tones·composite 가 없었다.)
+    확정판은 에이전트가 3축을 실제로 결합해야만 생기므로(graph.py, minutes 포함 시 1회 기록)
+    이 기준이면 수집과 처리 사이의 간극이 없다. DB 가 없으면 종전 파일 기준으로 폴백.
     """
     cutoff = (datetime.now(timezone.utc) - timedelta(days=months * 31)).strftime("%Y-%m-%d")
-    out = []
-    for d in meeting_dates():
-        if d < cutoff:
-            continue
-        _, _, got, total = axis_state(d)
-        if got < total:
-            out.append(d)
-    return out
+    dates = [d for d in meeting_dates() if d >= cutoff]
+    done = finalized_dates()
+    if done is not None:
+        return [d for d in dates if d not in done]
+    return [d for d in dates                      # 폴백(초기 부트스트랩): 종전 기준
+            if (lambda st: st[2] < st[3])(axis_state(d))]
 
 
 def write_status(path=OUT):

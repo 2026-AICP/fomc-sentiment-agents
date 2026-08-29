@@ -16,7 +16,6 @@ python3 engine/minutes_scrape.py || echo "  warn: 회의록 수집 실패(건너
 # ⓪-c 기자회견 트랜스크립트 — 회의 며칠 후 게시. 최근 4회의만 확인(멱등, 있으면 skip).
 python3 engine/presser_scrape.py || echo "  warn: 기자회견 수집 실패(건너뜀)"
 python3 agents/news_scheduler.py     # ① 수집 + FinBERT → 일별 News 지수 (+오늘의 감성)
-python3 analysis/daily_index.py      # ② Fed 계단 + 매일 News → 일별 결합(headline)
 TODAY_ET="$(TZ=America/New_York date +%F)"   # ③ 통합 에이전트 — 미국(ET) 오늘 날짜 기준
 # ③이 실패해도(의존성·네트워크 등) 이미 저장된 수집 결과는 유효하므로 ④는 반드시 실행한다.
 # set -e 아래서 한 단계 실패가 뒤 단계를 통째로 막던 문제 방지
@@ -37,6 +36,10 @@ if pending:
 graph.orchestrate(dates=[today] + pending)   # 신호 A~D(offset=0) → outputs/daily_signals.csv
 write_status()                               # outputs/axis_status.csv 갱신
 PY
+# ② Fed 계단 + 매일 News → 일별 결합(headline)
+#    ★에이전트(③) 뒤로 이동(2026-08): ③이 그날 새로 기록한 3축 결합(확정판 포함)을
+#    같은 실행의 홈 지수에 반영하기 위해서다. 앞에 두면 결합이 하루 늦게 반영된다.
+python3 analysis/daily_index.py || echo "  warn: 일별 결합 실패(건너뜀)"
 # ④ 대시보드 데이터 갱신 — 프론트는 계산하지 않고 이 JSON만 읽는다(환각 차단).
 #    실패해도 위 파이프라인 결과는 이미 저장됐으므로 경고만 남긴다.
 python3 analysis/export_dashboard.py dashboard-web/public/data \
