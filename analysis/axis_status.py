@@ -67,9 +67,14 @@ def axis_state(date: str):
     return have, exp, sum(1 for a in exp if have[a]), len(exp)
 
 
-def finalized_dates(db=DB):
-    """확정판(fed_composite_final)이 기록된 회의일 집합. DB 없으면 None."""
-    if not pathlib_exists(db):
+def finalized_dates(db=None):
+    """확정판(fed_composite_final)이 기록된 회의일 집합. DB 없으면 None.
+
+    db 기본값을 None 으로 두고 호출 시점에 모듈 변수 DB 를 읽는다 — 기본 인자로
+    DB 를 직접 걸면 import 시점 경로가 고정돼 테스트의 monkeypatch 가 무시된다.
+    """
+    db = DB if db is None else db
+    if not Path(db).exists():
         return None
     con = sqlite3.connect(db)
     try:
@@ -78,10 +83,6 @@ def finalized_dates(db=DB):
             "WHERE method='fed_composite_final' AND granularity='meeting'")}
     finally:
         con.close()
-
-
-def pathlib_exists(p):
-    return Path(p).exists()
 
 
 def pending_meetings(months=DEFAULT_MONTHS):
