@@ -14,8 +14,8 @@ const PAGES = [
   { key: "home", label: "홈", el: <Home /> },
   { key: "overview", label: "감성지수", el: <Overview /> },
   { key: "fomc", label: "FOMC", el: <Fomc /> },
-  { key: "signals", label: "신호", el: <Signals /> },
   { key: "news", label: "뉴스", el: <News /> },
+  { key: "signals", label: "신호", el: <Signals /> },
   { key: "market", label: "시장지표", el: <Market /> },
   { key: "method", label: "방법론", el: <Method /> },
 ];
