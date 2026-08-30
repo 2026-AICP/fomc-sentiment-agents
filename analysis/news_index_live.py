@@ -145,8 +145,14 @@ def index_for_window(csv_path=IN, center=None, before=3, after=1):
     df = load_live_news(csv_path)
     if center is not None:
         c = pd.to_datetime(center)
-        lo, hi = c - pd.Timedelta(days=before), c + pd.Timedelta(days=after)
-        df = df[(df["dt"] >= lo) & (df["dt"] <= hi)]
+        # 날짜 '포함' 의미: [center-before 일의 00:00, center+after 일의 24:00).
+        # ★경계 버그 수정(2026-08): 예전엔 hi 가 center+after 일의 00:00 이라 마지막 날은
+        #   자정 정각 행만 포함됐다 — before=after=0(당일치)이면 창이 비어 Fed 단독으로
+        #   폴백했고, 구 기본값(3,1)도 문서 서술("전후 [c-3, c+1]")과 달리 사실상
+        #   [c-3, c] 4일 트레일링이었다. 이제 구현이 서술과 일치한다.
+        lo = c - pd.Timedelta(days=before)
+        hi = c + pd.Timedelta(days=after + 1)
+        df = df[(df["dt"] >= lo) & (df["dt"] < hi)]
     return _score_window(df)
 
 

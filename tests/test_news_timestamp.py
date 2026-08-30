@@ -95,3 +95,23 @@ def test_collect_migrates_old_5col_csv(tmp_path, monkeypatch):
     assert len(df) == 2                                  # 구행 + 신행 둘 다 살아있음
     assert pd.Timestamp(df["dt"].iloc[0]).hour == 0      # 구행: date 폴백(자정)
     assert pd.Timestamp(df["dt"].iloc[1]).hour == 18     # 신행: 시각 보존
+
+
+def test_index_for_window_single_day_includes_intraday(tmp_path, monkeypatch):
+    """당일치 창(before=after=0)이 그날의 '하루 전체'를 포함하는지 고정.
+
+    경계 버그 회귀 방지(2026-08): hi 가 당일 00:00 이면 자정 행만 잡혀 창이 비고,
+    통합지수가 Fed 단독으로 조용히 폴백한다.
+    """
+    import csv
+    from analysis import news_index_live as nil
+    p = tmp_path / "news.csv"
+    with open(p, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f)
+        w.writerow(["date", "title", "description", "source", "url", "published_at"])
+        w.writerow(["2026-08-04", "Fed says a", "d", "s", "u1", "2026-08-04T10:00:00"])
+        w.writerow(["2026-08-04", "Fed says b", "d", "s", "u2", "2026-08-04T23:50:00"])
+        w.writerow(["2026-08-05", "Fed says c", "d", "s", "u3", "2026-08-05T00:10:00"])
+        w.writerow(["2026-08-03", "Fed says d", "d", "s", "u4", "2026-08-03T09:00:00"])
+    r = nil.index_for_window(csv_path=p, center="2026-08-04", before=0, after=0)
+    assert r is not None and r["n_articles"] == 2      # 당일 2건만 — 전날·다음날 제외
