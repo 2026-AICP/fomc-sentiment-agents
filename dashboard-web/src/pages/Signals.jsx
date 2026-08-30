@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useJson, fmt, gradeInfo, firedNames, stripEmoji } from "../lib/data";
 import { Pill } from "../components/ui";
 
@@ -39,8 +40,11 @@ const GRADES = [
 ];
 
 export default function Signals() {
+  const [showAll, setShowAll] = useState(false);   // 회의별 기록: 기본 최근 8건
   const { data: alerts } = useJson("alerts");
   if (!alerts) return <div className="loading">데이터를 불러오는 중입니다.</div>;
+
+  const recent = alerts.slice().reverse();   // 최신순
 
   return (
     <>
@@ -79,7 +83,7 @@ export default function Signals() {
       </div>
 
       <h2 className="sec">회의별 기록 (전체 {alerts.length}건, 최신순)</h2>
-      {alerts.slice().reverse().map((a) => {
+      {(showAll ? recent : recent.slice(0, 8)).map((a) => {
         const gi = gradeInfo(a.grade);
         return (
           <div className="alert-row" key={a.date}>
@@ -94,6 +98,14 @@ export default function Signals() {
           </div>
         );
       })}
+      {recent.length > 8 && (
+        <button type="button" onClick={() => setShowAll(!showAll)}
+          style={{ width: "100%", padding: "10px 0", marginTop: 6, cursor: "pointer",
+                   background: "none", border: "1px solid var(--line)", borderRadius: 4,
+                   color: "var(--accent)", font: "inherit", fontWeight: 600 }}>
+          {showAll ? "접기" : `더보기 (전체 ${recent.length}건)`}
+        </button>
+      )}
     </>
   );
 }
