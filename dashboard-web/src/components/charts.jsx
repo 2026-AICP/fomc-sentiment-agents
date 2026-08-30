@@ -1,4 +1,6 @@
 // 차트 — recharts 다크 스타일 (Streamlit 버전의 Altair 톤과 맞춤)
+// isAnimationActive={false}: 진입 애니메이션은 백그라운드 탭에서 rAF 스로틀로 중간에
+// 멈춰 선이 안 보인 채 굳는다(dasharray 동결 실측). 정적 렌더가 안전하다.
 import {
   ResponsiveContainer, AreaChart, Area, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell,
@@ -26,7 +28,7 @@ export function IndexArea({ data, x = "date", y, color = "#f9812f", height = 240
         <Tooltip {...TIP} />
         <ReferenceLine y={0} stroke="#9aa2ad" strokeDasharray="4 4" opacity={0.5} />
         <Area type="monotone" dataKey={y} stroke={color} strokeWidth={2.2}
-          fill={`url(#g-${y})`}
+          fill={`url(#g-${y})`} isAnimationActive={false}
           dot={data.length > 120 ? false : { r: 2.5, fill: color }} />
       </AreaChart>
     </ResponsiveContainer>
@@ -44,7 +46,9 @@ export function SimpleLine({ data, x = "date", series, height = 240 }) {
         <ReferenceLine y={0} stroke="#9aa2ad" strokeDasharray="4 4" opacity={0.5} />
         {series.map((s) => (
           <Line key={s.key} type="monotone" dataKey={s.key} name={s.name}
-            stroke={s.color} strokeWidth={2} dot={false} />
+            stroke={s.color} strokeWidth={s.width || 2} dot={false}
+            connectNulls={s.connectNulls || false}
+            isAnimationActive={false} />
         ))}
       </LineChart>
     </ResponsiveContainer>
@@ -63,9 +67,10 @@ export function DualLine({ data, x = "month", left, right, height = 280 }) {
         <Tooltip {...TIP} />
         <ReferenceLine yAxisId="l" y={0} stroke="#9aa2ad" strokeDasharray="4 4" opacity={0.5} />
         <Line yAxisId="l" type="monotone" dataKey={left.key} name={left.name}
-          stroke={left.color} strokeWidth={2.2} dot={false} />
+          stroke={left.color} strokeWidth={2.2} dot={false} isAnimationActive={false} />
         <Line yAxisId="r" type="monotone" dataKey={right.key} name={right.name}
-          stroke={right.color} strokeWidth={1.8} dot={false} opacity={0.85} />
+          stroke={right.color} strokeWidth={1.8} dot={false} opacity={0.85}
+          isAnimationActive={false} />
       </LineChart>
     </ResponsiveContainer>
   );
