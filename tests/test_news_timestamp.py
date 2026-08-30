@@ -113,5 +113,9 @@ def test_index_for_window_single_day_includes_intraday(tmp_path, monkeypatch):
         w.writerow(["2026-08-04", "Fed says b", "d", "s", "u2", "2026-08-04T23:50:00"])
         w.writerow(["2026-08-05", "Fed says c", "d", "s", "u3", "2026-08-05T00:10:00"])
         w.writerow(["2026-08-03", "Fed says d", "d", "s", "u4", "2026-08-03T09:00:00"])
+    # 검증 대상은 '창 경계'뿐 — 채점(_score_window)은 모킹해 FinBERT 모델 없이도 돈다
+    # (모델은 로컬·CI 환경에만 있고 저장소엔 없어, 실채점하면 환경 의존 테스트가 된다).
+    monkeypatch.setattr(nil, "_score_window",
+                        lambda df: {"n_articles": len(df)} if len(df) else None)
     r = nil.index_for_window(csv_path=p, center="2026-08-04", before=0, after=0)
     assert r is not None and r["n_articles"] == 2      # 당일 2건만 — 전날·다음날 제외
