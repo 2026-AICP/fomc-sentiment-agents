@@ -6,11 +6,21 @@ export default function Overview() {
   const { data: meetings } = useJson("meetings");
   const { data: news } = useJson("news_daily");
   const { data: combined } = useJson("daily_headline");
+  const { data: minutesTones } = useJson("minutes");
+  const { data: presserTones } = useJson("presser");
   const { data: alerts } = useJson("alerts");
   if (!meetings || !alerts) return <div className="loading">데이터를 불러오는 중입니다.</div>;
 
   const lastMeet = meetings[meetings.length - 1];
   const lastCombined = combined?.[combined.length - 1];
+  // 통합지수의 Fed 절반은 3축 결합값 — 성명문 하나만 보여주면 구성이 오해된다.
+  const lastMn = minutesTones?.find((r) => r.date === lastMeet.date);
+  const lastPr = presserTones?.find((r) => r.date === lastMeet.date);
+  const axesTxt = [
+    lastMeet.tone != null ? `성명문 ${fmt(lastMeet.tone)}` : null,
+    lastMn?.minutes != null ? `회의록 ${fmt(lastMn.minutes)}` : null,
+    lastPr?.presser != null ? `기자회견 ${fmt(lastPr.presser)}` : null,
+  ].filter(Boolean).join(" · ");
   const lastNews = news?.[news.length - 1];
   const lastAlert = alerts[alerts.length - 1];
   const g = gradeInfo(lastAlert.grade);
@@ -20,8 +30,8 @@ export default function Overview() {
     <>
       <h1>감성지수 추이</h1>
       <p className="sub">
-        연준 문서와 경제뉴스의 어조를 하나의 지수로 결합해 매일 산출합니다.
-        지수가 0보다 크면 낙관, 작으면 우려에 가까운 어조입니다.
+        연준 문서 세 종류(성명문·회의록·기자회견을 같은 비중으로 합친 값)와 경제뉴스를
+        1:1로 결합해 매일 산출합니다. 통합 지수는 과거 평균을 0으로 놓은 상대값입니다.
       </p>
 
       <div className="kpis">
@@ -30,8 +40,9 @@ export default function Overview() {
           meta={lastCombined
             ? `${lastCombined.date} · Fed ${fmt(lastCombined.fed)} · 뉴스 ${fmt(lastCombined.news)} 를 1:1 결합`
             : "산출 전"} />
-        <Kpi eyebrow="연준 성명문" value={fmt(lastMeet.tone)}
-          meta={`${lastMeet.date} 회의`} />
+        <Kpi eyebrow="연준 문서 (3축)"
+          value={<span style={{ color: "var(--accent)" }}>{fmt(lastCombined?.fed)}</span>}
+          meta={`${lastMeet.date} 회의 · ${axesTxt}`} />
         <Kpi eyebrow="경제뉴스" value={fmt(lastNews?.index)}
           meta={lastNews
             ? `${lastNews.date} · 기사 ${lastNews.n_articles}건${newsLabel ? ` · ${newsLabel.text}` : ""}`
