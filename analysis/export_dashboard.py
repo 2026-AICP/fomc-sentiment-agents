@@ -173,12 +173,41 @@ def export_axis_status():
             for r in _csv_rows(ROOT / "outputs" / "axis_status.csv")]
 
 
+def _pearson(pairs):
+    """[(x,y)...] → 상관계수 (표본<3 이면 None). 프론트는 계산하지 않으므로 여기서 확정."""
+    xs = [p[0] for p in pairs]; ys = [p[1] for p in pairs]
+    n = len(xs)
+    if n < 3:
+        return None
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxy = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+    sxx = sum((a - mx) ** 2 for a in xs); syy = sum((b - my) ** 2 for b in ys)
+    if sxx == 0 or syy == 0:
+        return None
+    return round(sxy / (sxx * syy) ** 0.5, 2)
+
+
+def export_axis_corr():
+    """세 문서 톤의 상호 상관 — FOMC 탭 '전체' 해석용 (회의일 기준 병합)."""
+    mt = {r["date"]: (_f(r.get("statement")), _f(r.get("minutes")))
+          for r in _csv_rows(ROOT / "outputs" / "minutes_tones.csv")}
+    pt = {r["date"]: (_f(r.get("statement")), _f(r.get("presser")))
+          for r in _csv_rows(ROOT / "outputs" / "presser_tones.csv")}
+    sm = [(s, m) for s, m in mt.values() if s is not None and m is not None]
+    sp = [(s, p) for s, p in pt.values() if s is not None and p is not None]
+    mp = [(mt[d][1], pt[d][1]) for d in mt.keys() & pt.keys()
+          if mt[d][1] is not None and pt[d][1] is not None]
+    return {"stmt_minutes": _pearson(sm), "stmt_presser": _pearson(sp),
+            "minutes_presser": _pearson(mp)}
+
+
 def export_meta(con, counts):
     """검증·유의성 수치 — 검증 스크립트로 확정된 값(문서 §참조). 프론트는 표시만."""
     norm = json.loads((ROOT / "analysis" / "headline_norm.json").read_text())
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "counts": counts,
+        "axis_corr": export_axis_corr(),
         "validation": {                       # build_headline_norm / validate_robustness
             **norm.get("validation", {}),
             "bootstrap_ci": [-0.634, -0.426],
