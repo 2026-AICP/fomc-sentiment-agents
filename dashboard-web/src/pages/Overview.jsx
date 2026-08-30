@@ -4,14 +4,13 @@ import { IndexArea } from "../components/charts";
 
 export default function Overview() {
   const { data: meetings } = useJson("meetings");
-  const { data: daily } = useJson("daily_signals");
   const { data: news } = useJson("news_daily");
   const { data: combined } = useJson("daily_headline");
   const { data: alerts } = useJson("alerts");
   if (!meetings || !alerts) return <div className="loading">데이터를 불러오는 중입니다.</div>;
 
   const lastMeet = meetings[meetings.length - 1];
-  const lastDaily = daily?.[daily.length - 1];
+  const lastCombined = combined?.[combined.length - 1];
   const lastNews = news?.[news.length - 1];
   const lastAlert = alerts[alerts.length - 1];
   const g = gradeInfo(lastAlert.grade);
@@ -27,13 +26,9 @@ export default function Overview() {
 
       <div className="kpis">
         <Kpi eyebrow="통합 감성지수"
-          value={<span style={{ color: "var(--accent)" }}>{fmt(lastDaily?.index)}</span>}
-          meta={lastDaily
-            ? `${lastDaily.date} · 연준 문서와 뉴스 결합`
-              + (lastDaily.gate_reason ? ` · ${lastDaily.gate_reason}` : "")
-              + (lastDaily.grade_final
-                  ? ` · 회의록 반영 확정판 ${fmt(lastDaily.index_final)} (${lastDaily.finalized_at?.slice(0, 10)})`
-                  : "")
+          value={<span style={{ color: "var(--accent)" }}>{fmt(lastCombined?.index)}</span>}
+          meta={lastCombined
+            ? `${lastCombined.date} · Fed ${fmt(lastCombined.fed)} · 뉴스 ${fmt(lastCombined.news)} 를 1:1 결합`
             : "산출 전"} />
         <Kpi eyebrow="연준 성명문" value={fmt(lastMeet.tone)}
           meta={`${lastMeet.date} 회의`} />
