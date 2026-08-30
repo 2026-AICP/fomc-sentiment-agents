@@ -139,7 +139,7 @@ def _fed_value_and_stats(idx):
 
 # ── ②b News Analyst + Combine (headline) ──
 def news_node(state: State) -> State:
-    """발표일 주변 뉴스로 News 지수 산출 후 Fed 지수(3축 결합)와 통합(headline).
+    """당일 뉴스로 News 지수 산출 후 Fed 지수(3축 결합)와 통합(headline).
 
     실시간 뉴스가 없으면(과거 회의) News=없음 → headline=Fed 단독 폴백.
     """
@@ -212,8 +212,15 @@ def news_node(state: State) -> State:
                 f"({'+'.join(fc['axes'])}{', 확정판' if state['fed_final'] else ', 속보치'})")
 
     fed, fed_stats = _fed_value_and_stats(state["index"])
-    before = int(os.getenv("NEWS_WINDOW_BEFORE", "3"))
-    after = int(os.getenv("NEWS_WINDOW_AFTER", "1"))
+    # ★당일치 고정(2026-08 팀 결정): 통합지수의 뉴스 성분은 그날 하루 기사만 쓴다.
+    # 이전 기본값(before=3, after=1)은 4일 트레일링 창이라(경계 버그로 after 일자는
+    # 사실상 미포함 — news_index_live.index_for_window 참조) 홈(daily_index, 당일치)과
+    # 에이전트 경로가 같은 날 서로 다른 '통합지수'를 만들었다. 프로젝트 취지가 실시간
+    # 신호 제공이므로 당일치로 통일한다. 표본이 얇은 날의 폭주는 지수를 창으로 뭉개서가
+    # 아니라 신뢰도 게이트(경보 보류)가 담당한다 — 측정과 경보의 분리.
+    # 분석 목적으로는 환경변수로 여전히 창을 지정할 수 있다.
+    before = int(os.getenv("NEWS_WINDOW_BEFORE", "0"))
+    after = int(os.getenv("NEWS_WINDOW_AFTER", "0"))
     try:
         news = index_for_window(center=date, before=before, after=after)
     except Exception as e:
