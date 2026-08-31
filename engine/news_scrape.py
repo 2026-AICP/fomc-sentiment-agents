@@ -129,7 +129,20 @@ def _one_page(key, from_date, page):
     except requests.RequestException as e:
         # 예외 메시지에 URL(=토큰) 노출 방지 → 유형만 보고 (from None 로 원인 체인 차단)
         raise ApiError(f"네트워크 오류: {type(e).__name__}") from None
-    data = r.json() if r.content else {}
+    # ★JSON 파싱 실패도 ApiError 로 감싼다(2026-08-31 장애).
+    # Marketaux 가 JSON 이 아닌 응답(HTML 오류 페이지·게이트웨이 오류·빈 본문)을 주면
+    # r.json() 이 JSONDecodeError 를 던지는데, 이건 ApiError 가 아니라서 discover_news 의
+    # 재시도·건너뛰기·부분보존 그물을 그대로 통과해 파이프라인 전체를 죽였다
+    # (실제 사고: 수집 0건 + set -e 로 일별결합·에이전트·대시보드 갱신까지 미실행).
+    # 어떤 응답이 왔든 '이 페이지 실패'로 격하시켜 나머지 단계는 살린다.
+    try:
+        data = r.json() if r.content else {}
+    except ValueError:                     # JSONDecodeError 는 ValueError 의 하위
+        head = (r.text or "").strip()[:80].replace("\n", " ")
+        # 상태코드가 오류면 아래 분기(429·402 등)가 판단할 수 있게 빈 dict 로 넘긴다.
+        if r.status_code == 200:
+            raise ApiError(f"JSON 아님 (HTTP 200, 본문 앞 80자: {head!r})")
+        data = {}
     if r.status_code != 200 or (isinstance(data, dict) and "error" in data):
         err = data.get("error", {}) if isinstance(data, dict) else {}
         code = str(err.get("code", "?"))
