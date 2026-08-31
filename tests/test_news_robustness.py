@@ -113,3 +113,54 @@ def test_collect_warns_on_zero(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(ns, "discover_news", lambda *a, **k: ([], 0))
     ns.collect(out=tmp_path / "fed_news.csv")
     assert "수집 0건" in capsys.readouterr().out
+
+
+class _FakeResp:
+    """requests.Response 대역 — JSON 이 아닌 본문을 흉내낸다."""
+    def __init__(self, status, text, headers=None):
+        self.status_code = status
+        self.text = text
+        self.content = text.encode()
+        self.headers = headers or {}
+
+    def json(self):
+        import json
+        return json.loads(self.text)      # 비-JSON 이면 ValueError
+
+
+def test_non_json_response_becomes_apierror(monkeypatch):
+    """JSON 이 아닌 응답(HTTP 200)이 ApiError 로 격하되는지 — 전체 중단 방지.
+
+    2026-08-31 장애 회귀: r.json() 의 JSONDecodeError 가 ApiError 그물을 통과해
+    파이프라인 전체를 죽였다(수집 0건 + 이후 단계 미실행).
+    """
+    import requests
+    monkeypatch.setattr(ns, "_api_key", lambda: "k")
+    monkeypatch.setattr(requests, "get",
+                        lambda *a, **k: _FakeResp(200, "<html>Gateway Error</html>"))
+    import pytest
+    with pytest.raises(ns.ApiError) as e:
+        ns._one_page("k", "2026-08-31T00:00", 1)
+    assert "JSON 아님" in str(e.value)
+
+
+def test_non_json_error_page_is_classified_by_status(monkeypatch):
+    """비-JSON 이라도 상태코드가 402 면 '복구 불가'로 분류돼 즉시 중단된다."""
+    import requests
+    monkeypatch.setattr(ns, "_api_key", lambda: "k")
+    monkeypatch.setattr(requests, "get",
+                        lambda *a, **k: _FakeResp(402, "<html>Payment Required</html>"))
+    import pytest
+    with pytest.raises(ns.ApiError) as e:
+        ns._one_page("k", "2026-08-31T00:00", 1)
+    assert e.value.terminal is True
+
+
+def test_pipeline_survives_non_json(monkeypatch):
+    """비-JSON 이 계속 와도 discover_news 는 예외 없이 반환한다(뒤 단계 보호)."""
+    _no_sleep(monkeypatch)
+    import requests
+    monkeypatch.setattr(requests, "get",
+                        lambda *a, **k: _FakeResp(200, "not json"))
+    arts, found = ns.discover_news(days_back=3, pages=10, retries=1)
+    assert arts == [] and found is None      # 죽지 않고 빈 결과로 끝난다

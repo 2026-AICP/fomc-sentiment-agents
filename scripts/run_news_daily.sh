@@ -15,7 +15,11 @@ python3 engine/scrape.py 3           # ⓪ 최신 FOMC 성명문 증분 수집 (
 python3 engine/minutes_scrape.py || echo "  warn: 회의록 수집 실패(건너뜀)"
 # ⓪-c 기자회견 트랜스크립트 — 회의 며칠 후 게시. 최근 4회의만 확인(멱등, 있으면 skip).
 python3 engine/presser_scrape.py || echo "  warn: 기자회견 수집 실패(건너뜀)"
-python3 agents/news_scheduler.py     # ① 수집 + FinBERT → 일별 News 지수 (+오늘의 감성)
+# ① 수집 + FinBERT → 일별 News 지수 (+오늘의 감성)
+#    ★|| 보호(2026-08-31): 이 단계만 무방비여서, 수집이 예기치 못한 예외로 죽으면
+#    set -e 가 뒤 단계(일별 결합·에이전트·대시보드 갱신)까지 통째로 막았다.
+#    뉴스가 안 들어와도 Fed 축·회의록·확정판 처리와 사이트 갱신은 계속돼야 한다.
+python3 agents/news_scheduler.py || echo "  warn: 뉴스 수집/지수 실패(건너뜀) — 뒤 단계는 계속"
 TODAY_ET="$(TZ=America/New_York date +%F)"   # ③ 통합 에이전트 — 미국(ET) 오늘 날짜 기준
 # ③이 실패해도(의존성·네트워크 등) 이미 저장된 수집 결과는 유효하므로 ④는 반드시 실행한다.
 # set -e 아래서 한 단계 실패가 뒤 단계를 통째로 막던 문제 방지
