@@ -7,21 +7,22 @@ FOMC 성명문(engine/scrape.py)과 짝을 이루는 "News 축" 수집 도구.
   · 환경변수 NEWS_API_KEY, 또는
   · 저장소 루트의 .newsapi_key 파일 (gitignore됨)
 
-Marketaux 무료 티어: 하루 100요청 · 요청당 3건 · 최근 기사 위주(실시간용).
-  → 한 번 실행에 pages*3건 수집 (자동화 기본 80쪽=240건). 과거·대량은 유료 전환.
+Marketaux 무료 티어: 하루 요청 한도는 플랜별(Free 100 · Basic 2,500 · Standard 10,000).
+  → 2026-08 Standard 전환(요청당 50건). 3일 창 풀 약 366건을 8요청에 전수 회수.
 
 ★표본추출(2026-08 지도교수 피드백 반영) — 아래 상수에 명시돼 있다:
   · 정렬은 최신순 고정(SORT). 랜덤 정렬은 API 가 제공하지 않는다.
-  · 중복 묶음(GROUP_SIMILAR)은 상수로 뽑아뒀고 현재는 API 기본값(true)과 같다 —
-    끄는 것은 유료 전환과 함께 결정하기로 보류. 상세는 상수 주석 참조.
-  전수 회수가 되면 정렬·절단 문제가 모두 사라진다. Basic($24/월, 요청당 20건) 전환 시
-  3일 창 풀(약 292건)을 15요청이면 다 받는다 → PER_PAGE 를 20 으로 올리면 된다.
+  · 중복 묶음(GROUP_SIMILAR)은 껐다 — API 의 불투명한 묶음 대신 URL 일치로 직접 제거.
+  Standard 전환으로 **전수 회수**가 되면서 정렬·절단 문제가 함께 사라졌다. 풀 전체를
+  받으므로 무엇이 잘렸는지 걱정할 필요가 없다.
+
 검증(과거 대량)은 WSJ, 운영(실시간)은 이 도구 — 소스 분리 원칙.
 Marketaux 자체 감성점수는 쓰지 않는다 → 우리 보정 FinBERT로 직접 산출.
 
-사용:  python3 engine/news_scrape.py           # 최근 3일 Fed 뉴스(5쪽)
+사용:  python3 engine/news_scrape.py           # 최근 3일 (기본 5쪽 = 250건)
        python3 engine/news_scrape.py 7         # 최근 7일
-       python3 engine/news_scrape.py 7 10      # 최근 7일 · 10쪽(≈30건)
+       python3 engine/news_scrape.py 7 20      # 최근 7일 · 20쪽(=1,000건)
+       ※ 자동화는 agents/news_scheduler.py 가 pages=40 으로 호출한다.
 """
 import csv
 import os
@@ -43,7 +44,9 @@ ENDPOINT = "https://api.marketaux.com/v1/news/all"
 #   bernanke, ECB 등)만 가진 기사를 놓친다. F 만 거는 건 필터의 필수조건과 같아서 손실이 없다.
 #   정밀 규칙(F그룹 AND M그룹)은 그대로 is_relevant 가 적용한다 (지도교수 세트, 2026-07).
 QUERY = '"federal reserve" | fed'
-PER_PAGE = 3            # 무료 티어 상한(요청당 3건). Basic=20 · Standard=50 로 상향 가능.
+# 요청당 기사 수 — 플랜 상한(Free 3 · Basic 20 · Standard 50 · Premium 100).
+# 2026-08 Standard 전환. 3일 창 풀 366건이 8요청이면 다 들어온다(한도 10,000/일).
+PER_PAGE = 50
 
 # ── 표본추출 옵션 — 기본값에 기대지 않고 명시한다 (2026-08 지도교수 피드백) ──
 # "검색 순서가 순서대로인지 랜덤인지 확인" 지적에 대한 답을 코드에 박아둔다.
@@ -64,12 +67,12 @@ SORT_ORDER = "desc"
 #     (2) 묶여서 안 온 기사는 rejected_news.csv 에도 안 남아 **감사 자체가 불가능**하다.
 #   그래서 끄고, 중복 제거는 우리 규칙(URL 일치)으로 직접 한다 — 기준이 문서에 남고
 #   몇 건을 지웠는지 셀 수 있다.
-#   ※ 아직 끄지 않았다 — 현재 값은 API 기본값(true)과 같아 **동작 변화가 없다.**
-#     무료 티어에서 끄면 풀이 커지는데 회수 용량(pages*3=240)은 그대로라 절단이 늘 수
-#     있어, 유료 전환(Basic: 요청당 20건 → 3일 창 292건을 15요청에 전수 회수)과 함께
-#     결정하기로 했다. 전환 시 아래를 False 로 바꾸고 PER_PAGE 를 20 으로 올리면 된다.
-#     상수로 뽑아둔 이유가 그것이다 — 결정되면 한 줄만 고치면 된다.
-GROUP_SIMILAR = True
+#   ※ 2026-08 Standard 전환으로 껐다. 무료 티어에서는 끄면 풀이 커지는데 회수 용량이
+#     따라가지 못해 절단이 늘 위험이 있어 보류했었다. 이제 요청당 50건이라 풀 전체를
+#     받으므로 그 위험이 없다 — 묶임을 풀어도 잃는 것이 없고, 얻는 것은 두 가지다:
+#       (1) 큰 이벤트(FOMC·잭슨홀)일수록 비슷한 기사가 많아 더 많이 묶이던 편향 제거
+#       (2) 묶여서 오지 않던 기사가 rejected_news.csv 에 남아 **감사가 가능**해짐
+GROUP_SIMILAR = False
 OUT = ROOT / "data" / "news" / "fed_news.csv"
 
 # ── 뉴스 선정 = 지도교수 키워드 세트(2026-07): F그룹 AND M그룹 (각 1개 이상 언급) ──

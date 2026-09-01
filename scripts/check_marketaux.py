@@ -12,6 +12,7 @@ Marketaux 대시보드(로그인 → API key)에서 받아 저장소 루트에 .
 실행:  python scripts/check_marketaux.py           # 전체 (약 36요청)
        python scripts/check_marketaux.py history   # ① 만 (6요청)
        python scripts/check_marketaux.py group     # ② 만 (약 30요청)
+       python scripts/check_marketaux.py plan      # 플랜 등급만 (1요청)
 
 ★매일 07:00 KST 자동화가 최대 80요청을 쓴다. 남는 여유가 20 남짓이라 전체 실행이
   안 들어갈 수 있다. 한도는 UTC 자정에 초기화된다.
@@ -111,6 +112,43 @@ def collect_urls(key, after, group_similar, pages=10, limit=3):
     return urls, times, n_req
 
 
+def section_plan(key):
+    """현재 플랜 등급 판별 — 요청 1개.
+
+    Marketaux 는 플랜을 알려주는 엔드포인트가 없다. 대신 **요청당 기사 수 상한**이
+    플랜마다 달라서(Free 3 · Basic 20 · Standard 50 · 그 이상 100), 크게 요청해
+    실제로 몇 건이 오는지 세면 등급이 나온다.
+    """
+    TIERS = {3: "Free ($0 · 100요청/일)", 20: "Basic ($24~29 · 2,500요청/일)",
+             50: "Standard ($41~49 · 10,000요청/일)", 100: "Premium 이상 (25,000+요청/일)"}
+    recent = (datetime.now(timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M")
+    print("=" * 66)
+    print("플랜 등급 확인")
+    print("=" * 66)
+    found, arts, err = _page(key, recent, limit=100)
+    if err:
+        print(f"  오류: {err}")
+        return
+    n = len(arts)
+    tier = TIERS.get(n)
+    print(f"  limit=100 요청 → 실제 반환 {n}건")
+    if tier:
+        print(f"  → 현재 플랜: {tier}")
+    else:
+        print(f"  → 알려진 등급과 일치하지 않습니다(Free 3 / Basic 20 / Standard 50 / 100).")
+        print("     플랜 변경 직후면 반영에 시간이 걸릴 수 있습니다.")
+    print(f"  (매칭 풀 {found}건)")
+
+    if n >= 20:
+        need = -(-(found or 0) // n) if found else 0
+        print(f"\n  전수 회수 시 필요 요청: 약 {need}개  (3일 창 {found}건 기준)")
+        print(f"  → engine/news_scrape.py 의 PER_PAGE 를 {n} 으로 올리면 됩니다.")
+    elif n == 3:
+        print("\n  ※ 아직 무료 등급입니다. 결제가 반영되지 않았거나,")
+        print("     결제한 계정과 이 키의 계정이 다를 수 있습니다.")
+    print("\n※ 총 1요청 사용.")
+
+
 def section_group(key):
     """② group_similar 대조 측정만 — 약 30요청."""
     from datetime import datetime, timedelta, timezone
@@ -171,9 +209,12 @@ def main():
     # 부분 실행 — 무료 한도(100/일)에서 매일 자동화가 최대 80을 쓰므로 전체(36요청)가
     # 안 들어갈 때가 있다. 필요한 절만 돌릴 수 있게 한다.
     part = sys.argv[1] if len(sys.argv) > 1 else "all"
-    if part not in ("all", "history", "group"):
-        sys.exit("사용법: python scripts/check_marketaux.py [all|history|group]")
+    if part not in ("all", "history", "group", "plan"):
+        sys.exit("사용법: python scripts/check_marketaux.py [all|history|group|plan]")
 
+    if part == "plan":
+        section_plan(key)
+        return
     if part == "group":
         section_group(key)
         return
