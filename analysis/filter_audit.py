@@ -16,7 +16,8 @@
   python3 analysis/filter_audit.py sample 40              # 일상 수집분에서 무작위 표본
   python3 analysis/filter_audit.py report                 # 판정 집계
 
-  python3 analysis/filter_audit.py sample 120 --backfill  # 백필(2021~2026) 연도별 층화
+  python3 analysis/filter_audit.py sample 60 --backfill   # 백필(2021~2026) 단순 무작위
+  python3 analysis/filter_audit.py sample 300 --backfill --stratify   # 연도 비교까지 하려면
   python3 analysis/filter_audit.py report --backfill      # 백필 표본 집계
 
 ★백필 감사가 따로인 이유: 백필 탈락분은 27.9만 건·5.5년치라 일상 수집분(수천 건·
@@ -160,8 +161,12 @@ def report(sheet=SHEET):
 
 def main():
     argv = sys.argv[1:]
-    # --backfill: 백필 탈락분(2021~2026)을 대상으로 연도별 층화 추출
+    # --backfill 은 대상 파일만 고른다. 층화는 --stratify 로 따로 켠다 —
+    # 둘을 묶어두면 "연도별로 뽑았으니 연도 비교가 된다"고 오해하기 쉽다.
+    # 층별 20건으로는 참값 15% 와 40% 의 신뢰구간이 겹쳐 비교가 성립하지 않는다.
+    # 연도 비교를 하려면 층별 50건(총 300건) 이상이 필요하다.
     backfill = "--backfill" in argv
+    stratify = "--stratify" in argv
     argv = [a for a in argv if not a.startswith("--")]
     cmd = argv[0] if argv else "sample"
     src = REJECTED_BACKFILL if backfill else REJECTED
@@ -169,14 +174,16 @@ def main():
 
     if cmd == "sample":
         n = int(argv[1]) if len(argv) > 1 else 40
-        got, total, out = make_sample(n, src=src, out=out, stratify=backfill)
+        got, total, out = make_sample(n, src=src, out=out, stratify=stratify)
         print(f"탈락 기사 {total:,}건 중 {got}건 추출"
-              f"{' (연도별 층화)' if backfill else ' (무작위)'} → {out}")
+              f"{' (연도별 층화)' if stratify else ' (단순 무작위)'} → {out}")
         print("verdict 칸에 0(무관)/1(주변)/2(중요)를 기입한 뒤 `report` 실행")
-        if backfill:
+        if stratify:
             print("\n※ 층화 표본이라 층별 건수가 같습니다. 전체 놓침률을 인용할 때는")
-            print("   층 크기(연도별 탈락 건수)로 가중해야 모집단 값이 됩니다 —")
-            print("   report 가 층별 값을 함께 출력하니 그것으로 판단하세요.")
+            print("   층 크기(연도별 탈락 건수)로 가중해야 모집단 값이 됩니다.")
+        else:
+            print(f"\n※ 모집단 {total:,}건에서 균등 확률로 뽑았으므로 전체 놓침률을")
+            print("   그대로 인용할 수 있습니다(가중 불필요).")
     elif cmd == "report":
         report(sheet=out)
     else:
