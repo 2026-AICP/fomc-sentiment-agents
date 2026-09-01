@@ -45,7 +45,7 @@ function Ticker() {
   const items = [
     { n: "S&P 500", ...field("spx", { chgKey: "spx_ret" }), s: "%",
       v: last.spx?.toLocaleString(undefined, { minimumFractionDigits: 2 }) ?? null },
-    { n: "VIX", ...field("vix", { chgKey: "vix_chg" }), s: "" },
+    { n: "VIX", ...field("vix", { chgKey: "vix_chg" }), s: "pt" },   // 포인트 차이 — % 오독 방지
     { n: "미 국채 2년", ...field("ust2y", { suffix: "%" }), s: "%p" },
     { n: "미 국채 10년", ...field("ust10y", { suffix: "%" }), s: "%p" },
     { n: "장단기 금리차", ...field("spread", { suffix: "%p" }), s: "%p" },
