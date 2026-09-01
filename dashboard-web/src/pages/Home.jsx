@@ -74,9 +74,13 @@ export default function Home() {
     const c = chgKey ? m[chgKey] : (v != null && prev != null ? Math.round((v - prev) * 100) / 100 : null);
     return [v ?? null, c ?? null];
   };
+  // 표기 규칙(2026-09 정리): '단위' 열은 종가의 단위이고, 전일비는 각 셀이 제 단위를 단다.
+  //  · S&P 전일비 = 등락률(%) — 지수의 하루 변화는 %가 관례(알림 사전등록 |S&P 1d|>1.78% 와 동일 단위)
+  //  · VIX 전일비 = 포인트 차이(pt) — %가 아님(사전등록 |VIX 1d|>2.40pt 와 동일 단위).
+  //    예전엔 접미사가 없어 %로 오독될 여지가 있었다.
   const indicators = [
     ["S&P 500", ...pick("spx", "spx_ret"), "지수", "%"],
-    ["VIX 변동성", ...pick("vix", "vix_chg"), "지수", ""],
+    ["VIX 변동성", ...pick("vix", "vix_chg"), "지수", "pt"],
     ["미 국채 2년", ...pick("ust2y"), "%", "%p"],
     ["미 국채 10년", ...pick("ust10y"), "%", "%p"],
     ["장단기 금리차", ...pick("spread"), "%p", "%p"],
@@ -204,7 +208,7 @@ export default function Home() {
           <h2>시장 지표</h2>
           <table className="data">
             <thead>
-              <tr><th>지표</th><th className="r">종가</th><th className="r">전일비</th><th className="c">단위</th></tr>
+              <tr><th>지표</th><th className="r">종가</th><th className="r">전일비</th><th className="c">종가 단위</th></tr>
             </thead>
             <tbody>
               {indicators.map(([n, v, c, u, s]) => (
