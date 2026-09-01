@@ -113,8 +113,14 @@ def _api_key():
     return key
 
 
-def _one_page(key, from_date, page):
-    """Marketaux 한 페이지 요청 → (articles, found). 키는 에러메시지/트레이스에 노출 안 함."""
+def _one_page(key, from_date, page, to_date=None):
+    """Marketaux 한 페이지 요청 → (articles, found). 키는 에러메시지/트레이스에 노출 안 함.
+
+    to_date 는 백필(engine/news_backfill.py)이 월 단위로 구간을 끊을 때 쓴다.
+    일상 수집은 상한 없이 최근분을 받으므로 None 이다. 요청 조립을 여기 한 곳에만
+    두려고 인자로 받는다 — 백필이 자체 요청 코드를 갖게 하면 정렬·묶음·오류 처리가
+    갈라져 두 경로의 표본 성격이 달라진다.
+    """
     import requests
     params = {
         "api_token": key,          # Marketaux는 쿼리파라미터 방식(헤더 미지원)
@@ -127,6 +133,8 @@ def _one_page(key, from_date, page):
         "sort_order": SORT_ORDER,
         "group_similar": "true" if GROUP_SIMILAR else "false",
     }
+    if to_date:
+        params["published_before"] = to_date
     try:
         r = requests.get(ENDPOINT, params=params, timeout=20)
     except requests.RequestException as e:
