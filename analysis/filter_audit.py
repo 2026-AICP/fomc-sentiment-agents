@@ -59,11 +59,24 @@ def _wilson(k, n, z=1.96):
 
 
 def _rows(path):
+    """CSV 읽기 — 인코딩을 자동 판별한다.
+
+    ★판정 시트는 사람이 엑셀로 열어 채운다. 한국어 윈도우 엑셀은 CSV 를 저장할 때
+      기본이 CP949 라, 우리가 utf-8-sig 로 쓴 파일도 저장하고 나면 CP949 가 된다.
+      utf-8-sig 로만 읽으면 UnicodeDecodeError 로 죽는다(실제로 겪음).
+      쓰기는 utf-8-sig 를 유지하되(엑셀이 한글을 바로 인식), 읽기는 둘 다 받는다.
+    """
     p = Path(path)
     if not p.exists():
         return []
-    with open(p, encoding="utf-8-sig", newline="") as f:
-        return list(csv.DictReader(f))
+    for enc in ("utf-8-sig", "cp949"):
+        try:
+            with open(p, encoding=enc, newline="") as f:
+                return list(csv.DictReader(f))
+        except UnicodeDecodeError:
+            continue
+    raise SystemExit(f"인코딩을 판별하지 못했습니다: {p}\n"
+                     "  엑셀에서 '다른 이름으로 저장 → CSV UTF-8' 로 다시 저장해 보세요.")
 
 
 def _stratify_by_year(rows, n, seed=SEED):
