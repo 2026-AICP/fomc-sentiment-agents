@@ -19,6 +19,7 @@ beautifulsoup4
 # Phase 5 — 시장 데이터
 yfinance
 pandas
+scipy   # analysis/conditional_null.py 의 이항검정(검정력 표)에만 쓴다
 # fredapi
 
 # Phase 7 — 멀티에이전트 (LangGraph)
