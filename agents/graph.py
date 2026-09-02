@@ -1,7 +1,7 @@
 """Phase 7 멀티에이전트 (LangGraph 5노드).
 
 검증된 도구를 노드로 감싼 배선:
-  Collector → Analyst → Market → Strategy → Reporting
+  Collector → Analyst → Market → Strategy → Notifier → Reporting
   (scrape)   (sentiment  (collect  (signals)  (report)
               ·aggregate) _market)
 
@@ -314,6 +314,7 @@ def strategy_node(state: State) -> State:
             g = GRADE_WATCH
 
     state["signals"] = {"grade": g, "fired": fired, "gate_reason": gate_reason,
+                        "details": [s.detail for s in sigs if s.fired],
                         "n_articles": news.get("n_articles") if news else None,
                         "ci_lo": news.get("ci_lo") if news else None,
                         "ci_hi": news.get("ci_hi") if news else None}
@@ -391,6 +392,64 @@ def _prev_combined(date, out=None):
     return prev
 
 
+# ── ⑤ Notifier (드라이런) ──
+def _recorded_grade(date, out=None):
+    """daily_signals.csv 에 이미 기록된 그 날짜의 속보치 등급. 없으면 None(첫 기록)."""
+    import csv
+    out = Path(out or DAILY_SIGNALS)
+    if not out.exists():
+        return None
+    for r in csv.DictReader(open(out, encoding="utf-8")):
+        if r.get("date") == date:
+            return r.get("grade") or None
+    return None
+
+
+def notifier_node(state: State) -> State:
+    """규칙 기반 발송 판정 — 판단 없이 전달만 한다(§10-5).
+
+    **실제 발송은 하지 않는다.** agents/notifier.py 가 smtplib·resend 를 import 하지
+    않으므로 호출할 발송 함수 자체가 없다. 남기는 것은 outputs/notification_log.csv
+    한 행뿐이고, 억제된 날도 사유 코드와 함께 남긴다 — 그래야 "며칠에 한 번 나갔을까"가
+    로그만 보고 나온다(§7-1).
+
+    reporting 앞에 두는 이유: reporting 이 daily_signals.csv 를 쓰기 전이라
+    _recorded_grade() 가 '이번 실행 이전'의 속보치를 읽는다. 정정 판정(§2-3)이
+    자기 자신과 비교하는 사고를 막는다.
+    """
+    from agents import notifier as nt
+    sig = state.get("signals") or {}
+    if not sig:
+        state["log"].append("[notifier] 등급 없음 → 건너뜀")
+        return state
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    sent = nt.read_log()
+    d = nt.decide(state["date"], sig.get("grade", "—"), sig.get("fired") or [],
+                  sig.get("n_articles"), sig.get("ci_lo"), sig.get("ci_hi"),
+                  today=today, sent=sent, details=sig.get("details"),
+                  news_only=not state["statement_path"])
+    nt.append_log(d)
+    if d.send:
+        subject, _ = nt.render(d)
+        state["log"].append(f"[notifier] 드라이런 발송 «{subject}» (신뢰도 {d.confidence})")
+    else:
+        state["log"].append(f"[notifier] 미발송 — {d.suppressed}")
+
+    # §2-3 정정 알림 — 확정판에서 등급이 '실제로' 바뀐 경우만. 그 날짜가 처음
+    # 기록되는 중이면(_recorded_grade 가 None) 정정이 아니라 최초 기록이다.
+    if state.get("fed_final"):
+        prev = _recorded_grade(state["date"])
+        c = prev and nt.decide_correction(state["date"], prev, sig.get("grade"),
+                                          today, sent=sent)
+        if c:
+            nt.append_log(c)
+            state["log"].append(f"[notifier] 정정 {prev} → {sig.get('grade')}"
+                                if c.send else f"[notifier] 정정 없음 — {c.suppressed}")
+    return state
+
+
+# ── ⑥ Reporting ──
 def reporting_node(state: State) -> State:
     conn = db.connect(DB)
     path = write_report(conn, state["date"], REPORTS,
@@ -451,7 +510,8 @@ def build_graph():
     g = StateGraph(State)
     for name, fn in [("collector", collector_node), ("analyst", analyst_node),
                      ("news", news_node), ("market", market_node),
-                     ("strategy", strategy_node), ("reporting", reporting_node)]:
+                     ("strategy", strategy_node), ("notifier", notifier_node),
+                     ("reporting", reporting_node)]:
         g.add_node(name, fn)
     g.set_entry_point("collector")
     g.add_conditional_edges("collector", route_after_collect,
@@ -459,7 +519,8 @@ def build_graph():
     g.add_edge("analyst", "news")
     g.add_edge("news", "market")
     g.add_edge("market", "strategy")
-    g.add_edge("strategy", "reporting")
+    g.add_edge("strategy", "notifier")
+    g.add_edge("notifier", "reporting")
     g.add_edge("reporting", END)
     return g.compile()
 
