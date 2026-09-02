@@ -23,16 +23,23 @@ function Grade({ g }) {
 }
 
 /** 일별 지수 스파크라인 — 0선을 함께 그려 부호를 읽히게 한다. */
-function Spark({ values, w = 300, h = 44 }) {
+// 초소형 추세 그래프 — 축·눈금 없이 방향과 굴곡만 보여준다(값은 옆 숫자가 말한다).
+// zero: 0 기준선(감성지수처럼 부호가 의미 있을 때만), dot: 최신값 강조점.
+function Spark({ values, w = 300, h = 44, color = "var(--accent)", zero = true, dot = false }) {
   if (!values?.length) return null;
   const lo = Math.min(...values), hi = Math.max(...values), rng = hi - lo || 1;
   const y = (v) => h - 4 - ((v - lo) / rng) * (h - 8);
-  const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${y(v)}`).join(" ");
+  const px = (i) => 2 + (i / (values.length - 1)) * (w - 4);
+  const pts = values.map((v, i) => `${px(i)},${y(v)}`).join(" ");
   return (
     <svg className="spark" width={w} height={h} viewBox={`0 0 ${w} ${h}`}
-      aria-label="최근 지수 추이">
-      <line x1="0" y1={y(0)} x2={w} y2={y(0)} stroke="var(--line)" strokeDasharray="3 3" />
-      <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="1.8" />
+      aria-hidden="true" style={{ flexShrink: 0 }}>
+      {zero && lo < 0 && hi > 0 && (
+        <line x1="0" y1={y(0)} x2={w} y2={y(0)} stroke="var(--line)" strokeDasharray="3 3" />
+      )}
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8"
+        strokeLinejoin="round" strokeLinecap="round" />
+      {dot && <circle cx={px(values.length - 1)} cy={y(values[values.length - 1])} r="2.2" fill={color} />}
     </svg>
   );
 }
@@ -61,6 +68,17 @@ export default function Home() {
   const rows = alerts.slice(-8).reverse();
 
   const m = market[market.length - 1];
+  // 지표별 최근 1년 흐름 — 숫자만으론 수준·방향이 안 잡혀서 작은 그래프를 붙인다.
+  // ★행 개수로 자르면 안 된다: 표본 간격이 불규칙해서(회의 주간 위주) 마지막 52행이
+  //   실제로는 약 3년치다. "52주"가 거짓이 되지 않게 날짜로 자른다.
+  const asOf = new Date(m.date);
+  const yearAgo = new Date(asOf); yearAgo.setDate(yearAgo.getDate() - 365);
+  const cut = yearAgo.toISOString().slice(0, 10);
+  const hist = (key) =>
+    market.filter((r) => r.date >= cut).map((r) => r[key]).filter((v) => v != null);
+  const spx52 = hist("spx");
+  const wk52 = spx52.length
+    ? { hi: Math.max(...spx52), lo: Math.min(...spx52) } : null;
   // 항목마다 가장 최근의 유효값 2개를 찾는다 — 마지막 행만 보면 그날 결측인 항목이 빈칸이 된다.
   const recent = (key) => {
     const out = [];
@@ -86,7 +104,6 @@ export default function Home() {
     ["장단기 금리차", ...pick("spread"), "%p", "%p"],
   ];
 
-  const mf = meta.minutes_finding, am = mf?.axis_means;
   const lastLabel = toneLabel(last.index);
   const conf = confidenceLevel(lastNews.n_articles, lastNews.ci_lo, lastNews.ci_hi);
 
@@ -206,47 +223,49 @@ export default function Home() {
       <aside>
         <div className="card">
           <h2>시장 지표</h2>
-          <table className="data">
-            <thead>
-              <tr><th>지표</th><th className="r">종가</th><th className="r">전일비</th><th className="c">종가 단위</th></tr>
-            </thead>
-            <tbody>
-              {indicators.map(([n, v, c, u, s]) => (
-                <tr key={n}>
-                  <td style={{ whiteSpace: "nowrap" }}>{n}</td>
-                  <td className="r"><span className="num">
-                    {v == null ? <span className="na">—</span>
-                      : v.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span></td>
-                  <td className="r"><N v={c} d={2} suffix={s} /></td>
-                  <td className="c u">{u}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="note">기준일 {m.date}</div>
-        </div>
-
-        {am && (
-          <div className="card">
-            <h2>문서별 평균 톤</h2>
-            <table className="data">
-              <thead><tr><th>문서</th><th className="r">평균</th><th>성격</th></tr></thead>
-              <tbody>
-                {[["성명문", am.statement, "공식 발표문"],
-                  ["회의록", am.minutes, "내부 논의 기록"],
-                  ["기자회견", am.presser, "즉석 질의응답"]].map(([n, v, d]) => (
-                  <tr key={n}><td>{n}</td><td className="r"><N v={v} /></td><td className="u">{d}</td></tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="note">
-              공식 발표문일수록 어조가 낙관적입니다. 전체 {mf.n_meetings}회 중{" "}
-              {Math.round(mf.pct_more_cautious * mf.n_meetings)}회에서 회의록이 성명문보다
-              신중했습니다.
+          <div className="pad" style={{ paddingTop: 10, paddingBottom: 6 }}>
+            {/* S&P 500 — 대표 지표는 크게, 52주 범위까지 */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 13, color: "var(--ink-2)" }}>S&P 500</div>
+                <div className="num" style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.25 }}>
+                  {indicators[0][1] == null ? "—"
+                    : indicators[0][1].toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
+                <div style={{ fontSize: 13 }}><N v={indicators[0][2]} d={2} suffix="%" /></div>
+              </div>
+              <Spark values={hist("spx")} w={124} h={52} color="var(--blue)" zero={false} dot />
             </div>
+            {wk52 && (
+              <div style={{ fontSize: 12, color: "var(--ink-2)", marginTop: 6 }}>
+                52주 최고 <span className="num">{wk52.hi.toLocaleString()}</span>
+                {" · "}최저 <span className="num">{wk52.lo.toLocaleString()}</span>
+              </div>
+            )}
+            <div style={{ borderTop: "1px solid var(--line)", margin: "12px 0 4px" }} />
+            {[
+              ["VIX 변동성", "vix", indicators[1][1], indicators[1][2], "pt", ""],
+              ["미 국채 2년", "ust2y", indicators[2][1], indicators[2][2], "%p", "%"],
+              ["미 국채 10년", "ust10y", indicators[3][1], indicators[3][2], "%p", "%"],
+              ["장단기 금리차", "spread", indicators[4][1], indicators[4][2], "%p", "%p"],
+            ].map(([name, key, v, c, cs, vs]) => (
+              <div key={key} style={{ display: "flex", justifyContent: "space-between",
+                                      alignItems: "center", gap: 10, padding: "7px 0" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, color: "var(--ink-2)", whiteSpace: "nowrap" }}>{name}</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span className="num" style={{ fontSize: 15.5, fontWeight: 600 }}>
+                      {v == null ? "—" : `${v.toLocaleString(undefined, { minimumFractionDigits: 2 })}${vs}`}
+                    </span>
+                    <span style={{ fontSize: 12.5 }}><N v={c} d={2} suffix={cs} /></span>
+                  </div>
+                </div>
+                <Spark values={hist(key)} w={96} h={34} color="var(--blue)" zero={false} dot />
+              </div>
+            ))}
           </div>
-        )}
+          <div className="note">기준일 {m.date} · 그래프는 최근 1년 흐름</div>
+        </div>
 
         <div className="card">
           <h2>이 사이트는</h2>
