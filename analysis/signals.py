@@ -42,6 +42,10 @@ DEFAULT_THRESHOLDS = Thresholds()
 # 결합(News+Fed) 지수용 θ — z-표준화 결합은 척도가 달라(std≈0.80) 데이터로 재보정.
 #   방법론 동일: theta_t=p25|결합|≈0.22, theta_shift=p85|Δ결합|≈0.95 (2000-2021 월별 결합, 잠정).
 #   시장 θ(θm·θvix·θrate)는 시장 척도라 그대로. 통합 에이전트(agents/graph.py)가 사용.
+#   ★ 재보정할 때: 새 θ 는 적용 시작일(경계일) 이후에만 쓴다. 이미 기록된 과거 등급을
+#     새 θ 로 다시 매기지 않는다 — 이유 5가지는 docs/notification_design.md §9
+#     「방침 결정 (2026-09-02) — θ 재보정분을 과거로 소급하지 않는다」. 바꿀 때 이전
+#     값과 경계일을 아래에 남길 것.
 COMBINED_THRESHOLDS = Thresholds(theta_shift=0.95, theta_t=0.22)
 
 # 종합 등급 라벨 (사용자가 보는 것)
