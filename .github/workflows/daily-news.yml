@@ -3,6 +3,8 @@ name: Daily news signal
 # 매일 07:00 KST(=22:00 UTC) 자동: 뉴스 수집 → 감성 지수 → 당일(offset=0) 신호 → deploy 커밋.
 # 시장은 미국 기준 — 07:00 KST면 전날 미국장 마감(한국 새벽) 직후라 '간밤 신호'가 신선하게 확정됨.
 # ※ cron 은 이 파일이 기본 브랜치(main)에 있어야 작동. 작업 대상은 deploy 브랜치.
+# ※ 이 잡은 deploy 브랜치까지만 갱신한다. 실제 사이트(https://aicp-econpilot.github.io)
+#    배포는 별도 저장소가 1시간 뒤 자기 일정으로 수행한다 — 아래 push 단계 주석 참조.
 on:
   workflow_dispatch:              # 수동 실행 버튼 (Actions 탭)
   schedule:
@@ -89,9 +91,24 @@ jobs:
           if git diff --cached --quiet; then
             echo "변경 없음 — 새 뉴스/신호 없음. 커밋 생략."
           else
-            # [skip ci] 를 붙이지 않는다 — 이 커밋이 Pages 배포(pages.yml)를 깨워야
-            # 매일 갱신된 데이터가 실제 사이트에 반영된다. 이 워크플로 자체는
-            # schedule/workflow_dispatch 로만 도므로 push 로 재실행되지 않는다(루프 없음).
+            # ★이 push 는 사이트 배포를 깨우지 않는다. 이 저장소에 Pages 워크플로가
+            #   없기 때문이다(2026-09 확인 — 예전 주석은 pages.yml 이 여기 있다고
+            #   적혀 있었으나 어느 브랜치에도 없다).
+            #   실제 배포는 사이트 저장소가 자기 일정으로 돌린다:
+            #     aicp-econpilot/aicp-econpilot.github.io  →  .github/workflows/publish.yml
+            #     cron "0 23 * * *" (23:00 UTC = 08:00 KST, 이 잡 1시간 뒤)
+            #     deploy 브랜치를 clone → npm run build → 그 저장소 Pages 로 배포
+            #   그래서 여기 커밋한 데이터는 **다음 23:00 UTC 에** 사이트에 나타난다.
+            #   더 빨리 반영하려면 그 저장소 Actions 에서 "Publish site" 를 수동 실행
+            #   (workflow_dispatch). 저장소 소유자가 달라 권한이 필요하다.
+            #
+            #   빌드가 그쪽 러너에서 도므로 dashboard-web 소스에 문법 오류가 있으면
+            #   배포가 실패하고 사이트는 이전 버전에 머문다(깨지지는 않는다).
+            #
+            #   [skip ci] 는 붙이지 않는다 — 지금은 push 로 도는 워크플로가 없어
+            #   효과가 없지만, 나중에 Pages 워크플로를 이 저장소로 들여올 때를 위해
+            #   그대로 둔다. 이 워크플로 자체는 schedule/workflow_dispatch 로만 도므로
+            #   이 push 로 재실행되지 않는다(루프 없음).
             git commit -m "chore: daily news signal refresh"
             git push origin HEAD:deploy/streamlit-dashboard
           fi
