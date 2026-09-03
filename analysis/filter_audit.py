@@ -204,4 +204,8 @@ def main():
 
 
 if __name__ == "__main__":
+    try:  # 한국어 윈도우 콘솔(cp949)에서 '—' 같은 문자에 죽지 않게
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
     main()
