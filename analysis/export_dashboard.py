@@ -65,11 +65,43 @@ def export_alerts(con):
             for a in alerts]
 
 
+# 백필(주별) → 라이브(일별) 경계. 이 날부터 라이브 일별을 쓴다.
+#   라이브 CSV 에도 07-03~07-09 가 있지만 수집 초기의 부실한 표본이다(하루 2~11건).
+#   같은 구간을 Standard 티어로 다시 전수 회수해 141건을 확보했으므로 백필 쪽을 쓴다.
+#   두 원본에 URL 이 겹치는 기사가 12건 있는데, 이 경계로 자르면 자연히 한 번만 센다.
+NEWS_LIVE_FROM = "2026-07-10"
+
+
+def _news_row(r, period):
+    return {"date": r["date"], "n_articles": int(r["n_articles"]),
+            "index": _f(r["conf_weighted"]), "ci_lo": _f(r["ci_lo"]),
+            "ci_hi": _f(r["ci_hi"]), "confidence": _f(r["confidence"], 3),
+            "period": period}
+
+
 def export_news_daily():
-    return [{"date": r["date"], "n_articles": int(r["n_articles"]),
-             "index": _f(r["conf_weighted"]), "ci_lo": _f(r["ci_lo"]),
-             "ci_hi": _f(r["ci_hi"]), "confidence": _f(r["confidence"], 3)}
-            for r in _csv_rows(ROOT / "outputs" / "news_index_live.csv")]
+    """뉴스 지수 — 백필(주별, 2021-01~2026-07-09) + 라이브(일별, 2026-07-10~).
+
+    ★두 구간의 집계 단위가 다른 이유: 백필 일별은 중앙값이 7건뿐이라 신뢰도 하한
+      (15건, news_signals.Thresholds)을 73% 의 날이 못 넘는다. 그대로 내보내면
+      5.5년의 4분의 3이 '신뢰도 낮음'으로 표시된다. 주별로 묶으면 중앙값 62건이
+      되어 하한 미달이 11% 로 떨어진다. 라이브는 매일 갱신이 목적이라 일별 유지.
+      프론트가 구분해 표시하도록 period 필드를 실어 보낸다.
+
+    ★선정 규칙은 두 구간이 같다(Marketaux 본문 F → 제목+설명 F∧M). 그래서 이어
+      붙일 수 있다. WSJ 백본(2000~2021)은 규칙이 다르므로 여기 섞지 않는다 —
+      경위와 영향 측정은 docs/scope_impact.md 참조.
+    """
+    bf_csv = ROOT / "outputs" / "news_index_backfill_weekly.csv"
+    if not bf_csv.exists():
+        # _csv_rows 는 없는 파일에 []를 돌려주므로 그냥 두면 5.5년치가 조용히 사라지고
+        # 사이트가 최근 두 달만 보여준다. 러너 로그에 남겨 알아챌 수 있게 한다.
+        print(f"  warn: 백필 지수가 없습니다({bf_csv.name}) — 뉴스축이 라이브 구간만 나갑니다.")
+    bf = [_news_row(r, "weekly") for r in _csv_rows(bf_csv)]
+    live = [_news_row(r, "daily")
+            for r in _csv_rows(ROOT / "outputs" / "news_index_live.csv")
+            if r["date"] >= NEWS_LIVE_FROM]
+    return bf + live
 
 
 def export_daily_headline():
@@ -203,7 +235,9 @@ def export_axis_corr():
 
 def export_meta(con, counts):
     """검증·유의성 수치 — 검증 스크립트로 확정된 값(문서 §참조). 프론트는 표시만."""
-    norm = json.loads((ROOT / "analysis" / "headline_norm.json").read_text())
+    # encoding 명시 — 없으면 로케일 기본(한국어 윈도우 cp949)으로 읽어 죽는다.
+    # 러너는 리눅스라 UTF-8 기본이어서 드러나지 않지만, 로컬 검증이 막힌다.
+    norm = json.loads((ROOT / "analysis" / "headline_norm.json").read_text(encoding="utf-8"))
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "counts": counts,
