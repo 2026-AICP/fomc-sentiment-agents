@@ -1,0 +1,2 @@
+date,kind,grade,fired,channel,n_recipients,n_failed,suppressed_reason
+2026-09-04,signal,⚪ 중립,,dryrun,,,grade_not_actionable
