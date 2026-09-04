@@ -78,6 +78,11 @@ jobs:
           # *.db 가 gitignore 라 목록에 없으면 러너와 함께 사라져, 매 실행이 빈 DB 로 시작하고
           # 3축 결합이 영영 안 쌓인다(2026-08: 그래서 통합 지수가 사실상 성명문 단독이었다).
           # 확정판을 '단 한 번만' 기록한다는 설계도 DB 가 남아야 성립한다.
+          # outputs/notification_log.csv — 알림 드라이런 기록(하루 1행, 발송/미발송 사유).
+          # outputs/ 가 gitignore 라 여기 목록에 없으면 러너와 함께 사라진다. 2026-09-05 확인
+          # 결과 실제로 그렇게 매일 유실되고 있었다(fomc.db·rejected_news.csv 와 같은 사고).
+          # 이 로그는 '기준을 언제 무엇으로 바꿨고 발송량이 어떻게 달라졌나'의 유일한 외부
+          # 증거이고, 사후 체리피킹이 불가능하다는 근거다 — docs/notification_open_decisions.md D-3.
           # data/news/rejected_news.csv — 필터가 버린 기사. data/news/ 가 gitignore 라
           # 여기 목록에 없으면 러너가 사라질 때 함께 증발한다(2026-08: 하루 164건이 그렇게
           # 유실됐다). 필터 감사(docs/filter_audit.md)의 유일한 표본이므로 반드시 보존한다.
@@ -85,6 +90,7 @@ jobs:
                    data/fomc.db \
                    outputs/axis_status.csv outputs/minutes_tones.csv outputs/presser_tones.csv \
                    outputs/vintage_meetings.csv \
+                   outputs/notification_log.csv \
                    dashboard-web/public/data; do
             git add -f "$p" 2>/dev/null || true
           done
