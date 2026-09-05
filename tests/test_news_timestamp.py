@@ -86,6 +86,9 @@ def test_collect_migrates_old_5col_csv(tmp_path, monkeypatch):
                "source": "reuters.com", "url": "new1",
                "published_at": "2026-06-17T18:30:00.000000Z"}
     monkeypatch.setattr(ns, "discover_news", lambda *a, **k: ([new_art], 1))
+    # 탈락분도 임시 경로로 — 안 바꾸면 _log_rejected 가 실제
+    # data/news/rejected_news.csv 에 쓴다(2026-09 발견, 테스트 격리 누락).
+    monkeypatch.setattr(ns, "REJECTED", tmp_path / "rejected.csv")
     ns.collect(out=p)                                    # API 미호출(monkeypatch)
 
     with open(p, encoding="utf-8-sig", newline="") as f:

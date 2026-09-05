@@ -66,6 +66,9 @@ def test_collect_filters_by_rule(tmp_path, monkeypatch):
          "source": "ft.com", "url": "f1", "published_at": "2026-06-17T20:00:00Z"},  # M만 → 제외
     ]
     monkeypatch.setattr(ns, "discover_news", lambda *a, **k: (raw, len(raw)))
+    # 탈락분도 임시 경로로 — 안 바꾸면 _log_rejected 가 실제
+    # data/news/rejected_news.csv 에 쓴다(2026-09 발견, 테스트 격리 누락).
+    monkeypatch.setattr(ns, "REJECTED", tmp_path / "rejected.csv")
     got, new, found = ns.collect(out=tmp_path / "fed_news.csv")
     assert {a["url"] for a in got} == {"r1"}
     with open(tmp_path / "fed_news.csv", encoding="utf-8-sig", newline="") as f:

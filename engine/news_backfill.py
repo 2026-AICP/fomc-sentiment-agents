@@ -42,7 +42,8 @@ sys.path.insert(0, str(ROOT))
 
 from engine.news_scrape import (                      # noqa: E402
     ApiError, BASE_DELAY, DELAY_STEP, MAX_DELAY, MAX_FAIL_STREAK, PER_PAGE,
-    RATE_LIMIT_WAIT, _api_key, _log_rejected, _one_page, is_relevant,
+    RATE_LIMIT_WAIT, _api_key, _log_rejected, _one_page, relevant_of,
+    _ensure_columns, _row, COLUMNS,
 )
 
 OUT = ROOT / "data" / "news" / "fed_news_backfill.csv"
@@ -52,7 +53,8 @@ STATE = ROOT / "data" / "news" / "backfill_state.json"
 DEFAULT_FROM, DEFAULT_TO = "2021-06", "2026-06"
 MAX_RESULT_SET = 20000      # Marketaux 하드 상한 — 넘으면 구간을 더 쪼갠다
 MAX_PAGES = 400             # 20,000 / PER_PAGE(50). 안전 상한
-COLUMNS = ["date", "title", "description", "source", "url", "published_at"]
+# 컬럼은 news_scrape.COLUMNS 를 그대로 쓴다 — 두 곳에 적어두면 어긋난다
+# (2026-09 snippet·keywords 추가 때 실제로 갈릴 뻔했다).
 
 
 # ── 기간 유틸 ────────────────────────────────────────────────────────────
@@ -144,6 +146,7 @@ def append_rows(rows, path=None) -> int:
     """
     path = Path(path or OUT)
     path.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_columns(path)                       # 구 스키마 자동 이관
     seen = set()
     if path.exists():
         with open(path, encoding="utf-8-sig") as f:
@@ -157,7 +160,7 @@ def append_rows(rows, path=None) -> int:
         if write_header:
             w.writerow(COLUMNS)
         for a in fresh:
-            w.writerow([a[c] for c in COLUMNS])
+            w.writerow(_row(a))
     return len(fresh)
 
 
@@ -235,7 +238,7 @@ def main():
             raw.extend(got)
             tot_req += n_req
 
-        kept = [x for x in raw if is_relevant(x["title"], x["description"])]
+        kept = [x for x in raw if relevant_of(x)]
         n_new = append_rows(kept)
         n_rej = _log_rejected(raw, kept, out=REJECTED)
         rate = f"{len(kept) / len(raw):.0%}" if raw else "-"

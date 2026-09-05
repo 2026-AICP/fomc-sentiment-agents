@@ -74,6 +74,10 @@ SORT_ORDER = "desc"
 #       (2) 묶여서 오지 않던 기사가 rejected_news.csv 에 남아 **감사가 가능**해짐
 GROUP_SIMILAR = False
 OUT = ROOT / "data" / "news" / "fed_news.csv"
+# CSV 컬럼 — 저장부·이관부가 모두 이 하나를 본다(순서가 어긋나면 데이터가 밀린다).
+# snippet·keywords 는 2026-09 추가. 관련성 판정 근거를 남겨 감사에 쓴다.
+COLUMNS = ["date", "title", "description", "source", "url", "published_at",
+           "snippet", "keywords"]
 
 # ── 뉴스 선정 = 지도교수 키워드 세트(2026-07): F그룹 AND M그룹 (각 1개 이상 언급) ──
 # ★키워드 세트는 data/wsj/(2000~2021) 수집 때 쓴 search_term 과 같지만,
@@ -103,10 +107,60 @@ _M_RE = re.compile(
 )
 
 
-def is_relevant(title, description=""):
-    """지도교수 규칙(2026-07): 제목+설명에 F그룹 최소1 AND M그룹 최소1 이면 True."""
-    text = f"{title or ''} {description or ''}"
+# ── 규칙을 적용할 텍스트 범위 (2026-09) ──────────────────────────────────────
+# ★키워드 세트(F∧M)는 지도교수 지정 사항이라 건드리지 않는다. 여기서 정하는 건
+#   그 단어를 **어디서 찾을지**다. Marketaux 가 이미 주는데 안 보던 필드가 둘 있다:
+#     snippet   평균 162자. description 과 다른 내용이다(표본 141건 중 115건이
+#               앞 60자부터 다름). 기존 코드에서는 description 이 없을 때만 쓰는
+#               폴백이었는데 description 결측이 0.0% 라 한 번도 도달하지 않았다.
+#     keywords  평균 82자(결측 약 49%). Marketaux 자동 태그.
+#
+#   실측(2026-08-30·09-01·09-03·09-04, 회수 620건):
+#     제목+설명            통과  78건
+#     + snippet            통과  95건 (+17)
+#     + keywords           통과 114건 (+36)
+#     + 둘 다              통과 128건 (+50, +64%)
+#
+#   ※ 정밀도와의 맞교환이다. 새로 통과한 50건을 눈으로 보니 절반은 명확한 정책
+#     기사(Warsh·Waller 발언, Fed rate hike 전망)였고, 절반은 연준을 스치듯
+#     언급하는 시장 논평이었다. 증가분의 대부분(+36)을 만드는 keywords 쪽이
+#     더 느슨하다. 보수적으로 가려면 snippet 만 넣는다.
+#
+#   ※ 방향으로는 백본과의 불일치를 **줄인다**. WSJ 백본은 ProQuest 가 기사 본문
+#     전체에서 F∧M 을 찾았으므로, 제목+설명만 보는 라이브가 훨씬 좁았다
+#     (docs/scope_impact.md). 넓힐수록 백본 쪽에 가까워진다.
+#
+# ★되돌리는 법 — 둘 중 하나. 코드 수정 없이 환경변수만으로도 된다.
+#     NEWS_MATCH_FIELDS="title,description"          ← 예전 동작으로 복귀
+#     NEWS_MATCH_FIELDS="title,description,snippet"  ← 보수안(snippet 만)
+#   또는 아래 기본값 문자열을 되돌린다. 저장된 CSV 는 손댈 필요가 없다 —
+#   되돌리면 그날부터 예전 규칙으로 판정하고, 이미 들어온 기사는 그대로 남는다.
+#   (이미 저장된 행을 예전 규칙으로 재판정하려면 title+description 만 있으면 되고
+#    그 두 컬럼은 처음부터 저장돼 있다.)
+_DEFAULT_MATCH_FIELDS = "title,description,snippet,keywords"
+MATCH_FIELDS = tuple(
+    f.strip() for f in os.getenv("NEWS_MATCH_FIELDS", _DEFAULT_MATCH_FIELDS).split(",")
+    if f.strip()
+)
+
+
+def is_relevant(title, description="", snippet="", keywords=""):
+    """지도교수 규칙(2026-07): F그룹 최소1 AND M그룹 최소1 이면 True.
+
+    규칙(F∧M)은 그대로고, 그 단어를 찾을 텍스트 범위만 MATCH_FIELDS 로 정한다.
+    snippet·keywords 를 넘기지 않으면 예전과 똑같이 동작한다(하위호환) —
+    WSJ 백본처럼 그 필드가 없는 자료에 그대로 쓸 수 있다.
+    """
+    have = {"title": title, "description": description,
+            "snippet": snippet, "keywords": keywords}
+    text = " ".join(str(have.get(f) or "") for f in MATCH_FIELDS)
     return bool(_F_RE.search(text) and _M_RE.search(text))
+
+
+def relevant_of(a):
+    """기사 dict 에 is_relevant 적용 — 호출부가 필드 목록을 알 필요 없게."""
+    return is_relevant(a.get("title"), a.get("description"),
+                       a.get("snippet"), a.get("keywords"))
 
 
 def _api_key():
@@ -197,6 +251,12 @@ def _one_page(key, from_date, page, to_date=None):
             "source": a.get("source") or "",              # 도메인 문자열
             "url": a.get("url") or "",
             "published_at": pub,                           # 시간대 정밀화(2d): 시각 보존
+            # ↓ 관련성 판정에만 쓴다(MATCH_FIELDS). **채점 텍스트는 아니다** —
+            #   FinBERT 가 읽는 것은 예전 그대로 description(짧으면 title)이라
+            #   지수 산출 방식은 바뀌지 않는다(news_index_live.load_live_news).
+            #   감사 때 "왜 통과/탈락했나"를 되짚으려면 남겨야 해서 CSV 에도 쓴다.
+            "snippet": a.get("snippet") or "",
+            "keywords": a.get("keywords") or "",
         })
     found = (data.get("meta") or {}).get("found")
     return arts, found
@@ -300,34 +360,49 @@ def discover_news(days_back=3, pages=5, retries=2):
     return out, found
 
 
-def _ensure_published_at_column(out):
-    """구 5컬럼 CSV(published_at 없음) → 6컬럼으로 이관. 신행 append 전 정합성 보장.
+def _ensure_columns(out, columns=None):
+    """구 스키마 CSV 를 현재 컬럼으로 이관 (멱등). 신행 append 전 정합성 보장.
 
-    이미 있는 fed_news.csv(구 스키마)에 6필드 행을 붙이면 헤더/데이터 컬럼수가 어긋나
-    깨지므로, append 전에 헤더에 published_at 을 더하고 구 행엔 빈값을 채운다(멱등)."""
+    구 헤더에 없는 컬럼을 뒤에 덧붙이고 기존 행은 빈값으로 채운다. 이걸 안 하면
+    헤더보다 필드가 많은 행이 붙어 DictReader 가 어긋난다.
+      2026-08  published_at 추가 (5 → 6컬럼)
+      2026-09  snippet·keywords 추가 (6 → 8컬럼) — 관련성 판정 범위 확대
+    컬럼 순서는 COLUMNS 를 따르되, **새 컬럼은 항상 뒤에 붙는다**(구 행 보존).
+    """
     out = Path(out)
+    cols = list(columns or COLUMNS)
     if not out.exists():
         return
     with open(out, encoding="utf-8-sig", newline="") as f:
         rows = list(csv.reader(f))
-    if not rows or "published_at" in rows[0]:
+    if not rows:
+        return
+    head = rows[0]
+    missing = [c for c in cols if c not in head]
+    if not missing:
         return                                          # 이미 최신 스키마 → no-op
     with open(out, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
-        w.writerow(rows[0] + ["published_at"])          # 헤더 + 새 컬럼
+        w.writerow(head + missing)
+        pad = [""] * len(missing)
         for r in rows[1:]:
-            w.writerow(r + [""])                        # 구 행 → 빈 시각(로드 시 date 폴백)
+            w.writerow(r + pad)
+
+
+def _row(a):
+    """기사 dict → CSV 행 (COLUMNS 순서). 누락 키는 빈값."""
+    return [a.get(c, "") for c in COLUMNS]
 
 
 def collect(days_back=3, pages=5, out=OUT):
     """뉴스 수집 → CSV 저장 (관련성 필터 + url 중복 제거, 멱등). WSJ와 동일 컬럼."""
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    _ensure_published_at_column(out)                    # 구 스키마 자동 이관
+    _ensure_columns(out)                                # 구 스키마 자동 이관
     raw, found = discover_news(days_back, pages)
     if not raw:                                         # CI 가시성: 0건이면 조용히 넘어가지 말 것
         print("  ⚠ 수집 0건 — API 키/네트워크/쿼터 확인 필요 (뉴스 갱신 안 됨)")
-    articles = [a for a in raw if is_relevant(a["title"], a["description"])]   # 2a 관련성 필터
+    articles = [a for a in raw if relevant_of(a)]       # 2a 관련성 필터(MATCH_FIELDS)
 
     seen = set()
     if out.exists():                                  # 기존 url 로드 (중복 방지)
@@ -340,10 +415,9 @@ def collect(days_back=3, pages=5, out=OUT):
     with open(out, "a", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
         if write_header:
-            w.writerow(["date", "title", "description", "source", "url", "published_at"])
+            w.writerow(COLUMNS)
         for a in new:
-            w.writerow([a["date"], a["title"], a["description"], a["source"],
-                        a["url"], a["published_at"]])
+            w.writerow(_row(a))
     n_rej = _log_rejected(raw, articles)
     # 수집 진단 — 기사가 어느 단계에서 줄어드는지 로그에 남긴다.
     # 2026-08 에 일별 기사가 급감했을 때 "필터가 문제냐 / 수집량이 문제냐 / API 실패냐"를
@@ -371,15 +445,25 @@ def collect(days_back=3, pages=5, out=OUT):
 REJECTED = ROOT / "data" / "news" / "rejected_news.csv"
 
 
-def _log_rejected(raw, kept, out=REJECTED):
+def _log_rejected(raw, kept, out=None):
     """탈락 기사 기록 — "필터가 중요한 기사를 얼마나 놓치는가"를 나중에 점검하려면
-    버리지 말고 남겨야 한다. url 중복은 건너뛰어 같은 기사가 쌓이지 않게 한다."""
+    버리지 말고 남겨야 한다. url 중복은 건너뛰어 같은 기사가 쌓이지 않게 한다.
+
+    ★기본값을 out=REJECTED 로 두지 않는 이유: 기본 인자는 **함수 정의 시점**에 한 번
+      평가돼 그때의 REJECTED 를 붙들고 있다. 호출부가 모듈의 REJECTED 를 임시 경로로
+      바꿔도 이 함수만 진짜 파일에 쓴다 — 2026-09 검증 중에 실제로 실기사 276행이
+      data/news/rejected_news.csv 에 들어갔다(되돌림). news_backfill.append_rows 가
+      같은 이유로 이미 None 을 쓰고 있는데 이쪽만 남아 있었다.
+      호출 시점에 모듈 전역을 보도록 None 으로 둔다.
+    """
+    out = out or REJECTED
     kept_urls = {a["url"] for a in kept}
     rejected = [a for a in raw if a.get("url") and a["url"] not in kept_urls]
     if not rejected:
         return 0
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_columns(out)                                # 구 스키마 자동 이관
     seen = set()
     if out.exists():
         with open(out, encoding="utf-8-sig") as f:
@@ -391,10 +475,9 @@ def _log_rejected(raw, kept, out=REJECTED):
     with open(out, "a", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
         if write_header:
-            w.writerow(["date", "title", "description", "source", "url", "published_at"])
+            w.writerow(COLUMNS)
         for a in fresh:
-            w.writerow([a["date"], a["title"], a["description"], a["source"],
-                        a["url"], a["published_at"]])
+            w.writerow(_row(a))
     return len(fresh)
 
 
