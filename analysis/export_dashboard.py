@@ -85,6 +85,9 @@ def export_daily_headline():
     """
     return [{"date": r["date"], "index": _f(r["headline"]),
              "fed": _f(r["fed_carry"]), "news": _f(r["news"]),
+             # news_z = 결합에 실제로 들어간 뉴스 z 값. fed 는 이미 z 척도라 그대로다.
+             # 표시부가 index = 0.5·fed + 0.5·news_z 를 그대로 보여줄 수 있게 내보낸다.
+             "news_z": _f(r["news_z"]) if r.get("news_z") else None,
              "method": r.get("method") or None,
              "n_articles": int(r["n_articles"]) if r.get("n_articles") else None}
             for r in _csv_rows(ROOT / "outputs" / "daily_headline.csv")]
@@ -203,7 +206,9 @@ def export_axis_corr():
 
 def export_meta(con, counts):
     """검증·유의성 수치 — 검증 스크립트로 확정된 값(문서 §참조). 프론트는 표시만."""
-    norm = json.loads((ROOT / "analysis" / "headline_norm.json").read_text())
+    # encoding 명시 — 없으면 로케일 기본(한국어 윈도우 cp949)으로 읽어 죽는다.
+    # 러너는 리눅스라 UTF-8 기본이어서 드러나지 않지만, 로컬 검증이 막힌다.
+    norm = json.loads((ROOT / "analysis" / "headline_norm.json").read_text(encoding="utf-8"))
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "counts": counts,
