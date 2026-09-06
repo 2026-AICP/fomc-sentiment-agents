@@ -1,6 +1,6 @@
 """검증 시리즈 생성 — 통합(z) vs VIX 월별 256개월 → analysis/validation_series.json (커밋).
 
--0.534 상관의 '원본 시계열'을 웹 대시보드가 겹쳐 그릴 수 있게 저장한다.
+-0.524 상관의 '원본 시계열'을 웹 대시보드가 겹쳐 그릴 수 있게 저장한다.
 validate_robustness.aligned()/combined() 재사용(동일 데이터·동일 z) — 수치 불일치 방지.
 yfinance 네트워크가 필요하므로 export_dashboard 와 분리(한 번 생성해 커밋, export는 복사만).
 

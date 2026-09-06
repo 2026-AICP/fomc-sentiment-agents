@@ -4,7 +4,7 @@ React/Lovable 등 웹 프론트는 파이썬을 못 돌리므로, DB·CSV의 분
 정적 JSON으로 변환한다. 프론트는 이 파일들만 fetch해서 렌더(계산 없음 — 환각 차단).
 
 산출 (기본 outputs/dashboard/):
-  meta.json           생성시각·기간·건수 + 검증 수치(-0.534, 홀드아웃, CI, LOMO, 괴리 2.4x, presser 87%)
+  meta.json           생성시각·기간·건수 + 검증 수치(-0.524, 홀드아웃, CI, LOMO, 괴리 2.4x, presser 87%)
   meetings.json       회의별 Fed 톤 (conf_weighted, confidence)
   alerts.json         회의별 신호 (등급·발동·톤·시장반응) — 검증된 signals 엔진 재사용
   news_daily.json     일별 News 지수 (+ 부트스트랩 CI, 기사수)
@@ -283,7 +283,7 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB)
 
-    vs = ROOT / "analysis" / "validation_series.json"    # 감성↔시장 월별(-0.534 원본, 커밋본)
+    vs = ROOT / "analysis" / "validation_series.json"    # 감성↔시장 월별(-0.524 원본, 커밋본)
     files = {
         "sentiment_vs_market.json": json.loads(vs.read_text(encoding="utf-8")) if vs.exists() else {},
         "meetings.json": export_meetings(con),
