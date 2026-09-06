@@ -283,7 +283,7 @@ def strategy_node(state: State) -> State:
     if not state["index"]:
         state["log"].append("[strategy] 인덱스 없음 → 건너뜀")
         return state
-    # 신호 톤 = 결합(News+Fed) 지수 — 검증된 두 축 이점(-0.534)을 신호에 반영.
+    # 신호 톤 = 결합(News+Fed) 지수 — 검증된 두 축 이점(-0.524)을 신호에 반영.
     tone = (state.get("headline") or {}).get("headline")
     if tone is None:                                  # 결합 없으면 Fed 단독 z 로 폴백
         fed, fed_stats = _fed_value_and_stats(state["index"])

@@ -137,7 +137,7 @@ def run(boot=True):
 
 
 def repro_check():
-    """기존 VIX 수치(-0.436 / -0.386 / -0.534) 재현 — 파이프라인 건전성 확인.
+    """기존 VIX 수치(-0.423 / -0.385 / -0.524) 재현 — 파이프라인 건전성 확인.
 
     새 지표에서 이상한 값이 나왔을 때 지표 탓인지 코드 탓인지 가르는 유일한 장치다.
     """
@@ -146,7 +146,8 @@ def repro_check():
     vix = vix_monthly(axes.index.min(), axes.index.max() + pd.offsets.MonthEnd(1))
     df = pd.concat([axes, vix.rename("y")], axis=1).dropna()
     got = {k: round(float(df[k].corr(df.y)), 3) for k in ("fed", "news", "combined")}
-    want = {"fed": -0.436, "news": -0.386, "combined": -0.534}
+    # T=1 엔진 기준(2026-09 갱신). T=3.1 시절 값은 -0.436/-0.386/-0.534 였다.
+    want = {"fed": -0.423, "news": -0.385, "combined": -0.524}
     print(f"\n[재현 확인] VIX 상관 ({len(df)}개월)")
     for k in want:
         mark = "OK" if abs(got[k] - want[k]) <= 0.02 else "불일치"

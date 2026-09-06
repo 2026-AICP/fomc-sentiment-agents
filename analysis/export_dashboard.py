@@ -4,7 +4,7 @@ React/Lovable 등 웹 프론트는 파이썬을 못 돌리므로, DB·CSV의 분
 정적 JSON으로 변환한다. 프론트는 이 파일들만 fetch해서 렌더(계산 없음 — 환각 차단).
 
 산출 (기본 outputs/dashboard/):
-  meta.json           생성시각·기간·건수 + 검증 수치(-0.534, 홀드아웃, CI, LOMO, 괴리 2.4x, presser 87%)
+  meta.json           생성시각·기간·건수 + 검증 수치(-0.524, 홀드아웃, CI, LOMO, 괴리 2.4x, presser 87%)
   meetings.json       회의별 Fed 톤 (conf_weighted, confidence)
   alerts.json         회의별 신호 (등급·발동·톤·시장반응) — 검증된 signals 엔진 재사용
   news_daily.json     일별 News 지수 (+ 부트스트랩 CI, 기사수)
@@ -79,9 +79,14 @@ def export_daily_headline():
     읽으면서 이름만 '통합'이라 붙이고 있었다(2026-08 발견).
 
     ★척도 주의: headline 은 각 축을 z-표준화해 합친 **상대값**이라 0이 과거 평균이고,
-    뉴스 원값처럼 -1~+1 범위가 아니다. 게다가 현재 z 파라미터(headline_norm.json)가
-    월별 집계에서 나온 값이라 일별에 쓰면 크기가 약 4배 부풀려진다 — 부호와 상대 순서는
-    맞지만 절대 크기는 아직 신뢰할 수 없다. 정상 수집이 쌓인 뒤 일별 분포로 재추정할 것.
+    뉴스 원값처럼 -1~+1 범위가 아니다. 2026-09 에 z 파라미터를 T=1 기준으로
+    재생성해(T=3.1 시절 값이 남아 있었다) 크기가 상당히 정상화됐지만, 아직
+    **월별** 분포에서 구한 값을 일별에 쓰고 있어 여전히 부풀려진다.
+    모집단·집계 단위까지 맞추는 안은 검토 중이다 — docs/headline_norm_issue.md.
+
+    ★news_z: 결합에 실제로 들어간 뉴스 z 값. fed 는 이미 z 척도다.
+    둘을 함께 내보내야 화면에서 index = 0.5·fed + 0.5·news_z 가 검산된다
+    (원값 news 만 보여주다 "계산이 안 맞는다"는 지적을 받았다, 2026-09-05).
     """
     return [{"date": r["date"], "index": _f(r["headline"]),
              "fed": _f(r["fed_carry"]), "news": _f(r["news"]),
@@ -248,7 +253,7 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB)
 
-    vs = ROOT / "analysis" / "validation_series.json"    # 감성↔시장 월별(-0.534 원본, 커밋본)
+    vs = ROOT / "analysis" / "validation_series.json"    # 감성↔시장 월별(-0.524 원본, 커밋본)
     files = {
         "sentiment_vs_market.json": json.loads(vs.read_text(encoding="utf-8")) if vs.exists() else {},
         "meetings.json": export_meetings(con),

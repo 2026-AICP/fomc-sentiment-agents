@@ -1,4 +1,4 @@
-"""강건성 종합 그림 — 통합↔VIX(-0.534)의 신뢰성을 3각도로 한눈에 (포스터용).
+"""강건성 종합 그림 — 통합↔VIX(-0.524)의 신뢰성을 3각도로 한눈에 (포스터용).
 
   · Holdout(시간분할): 안 본 기간에도 유지 → 과최적 아님
   · Bootstrap 95% CI: 0과 구분 → 우연 아님
@@ -77,7 +77,7 @@ def main():
     axl.legend(loc="upper right", fontsize=9)
     axl.grid(axis="y", alpha=0.25)
 
-    fig.suptitle("Robustness of Combined index ↔ VIX  (−0.534, 256 months)", fontsize=13, y=1.02)
+    fig.suptitle("Robustness of Combined index ↔ VIX  (−0.524, 256 months)", fontsize=13, y=1.02)
     fig.tight_layout()
     out = FIGDIR / "robustness_summary.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
