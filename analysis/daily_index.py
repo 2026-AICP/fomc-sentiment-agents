@@ -15,7 +15,10 @@ Fed 축(성명문·회의록·기자회견 1:1:1 결합, 8×/년)을 계단(carr
           두 경로가 fed_composite_asof 를 함께 쓰도록 통일한다.
   · News: outputs/news_index_live.csv (agents/news_scheduler.py 산출, 일별)
 결합:  analysis.headline.combine — 각 축 z-표준화 후 News:Fed = 1:1
-산출:  outputs/daily_headline.csv (date, fed_carry, news, headline, method, n_articles)
+산출:  outputs/daily_headline.csv
+         (date, fed_carry, news, news_z, headline, method, n_articles)
+       fed_carry 는 이미 z 척도, news 는 원값, news_z 는 그 z 값이다.
+       headline = w_fed·fed_carry + w_news·news_z 로 재현된다.
 
 실행:  python3 analysis/daily_index.py   (먼저 agents/news_scheduler.py 실행 필요)
 """
@@ -27,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from analysis.analyze_alignment import fed_composite_asof
-from analysis.headline import combine
+from analysis.headline import combine, _axis_stats, _z
 
 DB = ROOT / "data" / "fomc.db"           # 통일 DB (에이전트·pipeline 과 공유)
 NEWS_CSV = ROOT / "outputs" / "news_index_live.csv"
@@ -79,10 +82,16 @@ def build_daily(news_csv=NEWS_CSV, out=OUT):
         # fed 는 이미 z-척도라 combine() 이 다시 표준화하면 척도가 깨진다
         # → fed_stats=(0,1) 로 그대로 통과시킨다 (agents/graph.py 와 동일 처리).
         h = combine(fed, nv, fed_stats=(0.0, 1.0))
+        # 뉴스의 z 값도 기록한다 — headline 은 z 척도인데 news 는 원값이라, 둘만
+        # 나란히 두면 "Fed + 뉴스를 1:1 결합"이 계산과 맞지 않아 보인다(실제로
+        # 2026-09 에 대시보드에서 그 지적이 나왔다). 결합에 실제로 들어간 값을
+        # 남겨 표시부가 그대로 보여줄 수 있게 한다. fed_carry 는 이미 z 척도다.
+        nz = _z(nv, _axis_stats("news"))
         rows.append({
             "date": day,
             "fed_carry": round(fed, 4) if fed is not None else None,
             "news": round(nv, 4),
+            "news_z": round(nz, 4),
             "headline": round(h["headline"], 4) if h else None,
             "method": h["method"] if h else None,
             "n_articles": int(r["n_articles"]),

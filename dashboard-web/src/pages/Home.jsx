@@ -139,8 +139,11 @@ export default function Home() {
                 <b style={{ color: conf.color }}>{conf.label}</b>
                 <span style={{ opacity: 0.7 }}>· {conf.why}</span>
               </div>
+              {/* 표시값은 결합에 실제로 들어간 z 값이다. 뉴스 원값(-1~+1)을 그대로
+                  보여주면 "1:1 결합"이 계산과 맞지 않아 보인다(2026-09 지적). */}
               <div className="sub2">
-                Fed <N v={last.fed} /> · 뉴스 <N v={last.news} /> 를 1:1 로 결합
+                Fed <N v={last.fed} /> · 뉴스 <N v={last.news_z ?? last.news} /> 를 1:1 로 결합
+                <span style={{ opacity: 0.6 }}> (표준화 점수)</span>
               </div>
               <div className="sub2">최근 {series.length}일 흐름</div>
             </div>

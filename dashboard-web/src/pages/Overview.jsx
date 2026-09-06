@@ -38,7 +38,8 @@ export default function Overview() {
         <Kpi eyebrow="통합 감성지수"
           value={<span style={{ color: "var(--accent)" }}>{fmt(lastCombined?.index)}</span>}
           meta={lastCombined
-            ? `${lastCombined.date} · Fed ${fmt(lastCombined.fed)} · 뉴스 ${fmt(lastCombined.news)} 를 1:1 결합`
+            ? `${lastCombined.date} · Fed ${fmt(lastCombined.fed)} · 뉴스 `
+              + `${fmt(lastCombined.news_z ?? lastCombined.news)} (표준화 점수) 를 1:1 결합`
             : "산출 전"} />
         <Kpi eyebrow="연준 문서 (3축)"
           value={<span style={{ color: "var(--accent)" }}>{fmt(lastCombined?.fed)}</span>}
