@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useJson, fmt } from "./lib/data";
 import Home from "./pages/Home";
+import Summary from "./pages/Summary";
 import Overview from "./pages/Overview";
 import Signals from "./pages/Signals";
 import News from "./pages/News";
@@ -12,6 +13,7 @@ import Method from "./pages/Method";
 // 라벨은 이모지 없이, 방문자가 아는 말로.
 const PAGES = [
   { key: "home", label: "홈", el: <Home /> },
+  { key: "summary", label: "요약", el: <Summary /> },
   { key: "overview", label: "감성지수", el: <Overview /> },
   { key: "fomc", label: "FOMC", el: <Fomc /> },
   { key: "news", label: "뉴스", el: <News /> },
