@@ -14,6 +14,11 @@ test('isValidEmail: 명백한 쓰레기를 거른다', () => {
   assert.equal(isValidEmail(''), false);
   assert.equal(isValidEmail(null), false);
   assert.equal(isValidEmail('a'.repeat(250) + '@b.com'), false); // 254자 초과
+  assert.equal(isValidEmail('Foo<victim@example.com>'), false); // 표시이름 형식
+  assert.equal(isValidEmail('a<b@x.com'), false);
+  assert.equal(isValidEmail('a@x.com,b@y.com'), false);
+  assert.equal(isValidEmail('user+tag@sub.example.co.kr'), true); // 정상은 통과해야
+  assert.equal(isValidEmail('a.b_c-d@x.io'), true);
 });
 
 test('normalizeEmail: 앞뒤 공백 제거 + 소문자', () => {
@@ -193,4 +198,11 @@ test('checkRate: IP 마다 따로 센다', async () => {
 
   assert.equal(await checkRate(kv, '1.2.3.4'), false);
   assert.equal(await checkRate(kv, '5.6.7.8'), true);
+});
+
+test('checkRate: IPv6 는 /64 단위로 묶어서 센다', async () => {
+  const kv = new FakeKV();
+  for (let i = 0; i < 5; i += 1) await checkRate(kv, '2001:db8:1:2:aaaa::1');
+  assert.equal(await checkRate(kv, '2001:db8:1:2:bbbb::9'), false, '같은 /64 는 같은 카운터');
+  assert.equal(await checkRate(kv, '2001:db8:1:3::1'), true, '다른 /64 는 별개');
 });

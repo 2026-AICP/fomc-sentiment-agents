@@ -12,7 +12,10 @@ export const LEVELS = ['alert', 'caution'];
 export function isValidEmail(email) {
   return typeof email === 'string'
     && email.length <= 254
-    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    // 공백뿐 아니라 주소목록·표시이름 구분자도 막는다. "Foo<victim@x.com>" 은
+    // @ 가 하나뿐이라 예전 정규식을 통과했는데, 메일은 안쪽 주소로 가고 KV 키는
+    // 문자열 전체의 해시라 같은 사람이 여러 번 등록된다 (중복제거 무력화).
+    && /^[^\s@,;<>()[\]\\"]+@[^\s@,;<>()[\]\\"]+\.[^\s@,;<>()[\]\\"]+$/.test(email);
 }
 
 // 대소문자만 다른 주소가 두 건으로 쌓이는 것을 막는다. 로컬파트는 RFC 상
@@ -46,13 +49,7 @@ export async function subscribe(kv, sendMail, { email, level }) {
   }
 
   const hash = await sha256Hex(normalized);
-
-  // 재가입이면 옛 해지 토큰의 역인덱스를 먼저 지운다. 안 지우면 tok: 키가
-  // 영원히 쌓이고, 옛 링크로도 해지가 된다.
   const prev = await kv.get(`sub:${hash}`, 'json');
-  if (prev && prev.unsub_token) {
-    await kv.delete(`tok:${prev.unsub_token}`);
-  }
 
   const record = {
     id: crypto.randomUUID(),
@@ -65,22 +62,25 @@ export async function subscribe(kv, sendMail, { email, level }) {
     unsub_token: randomToken(),
   };
 
-  await kv.put(`sub:${hash}`, JSON.stringify(record));
-  await kv.put(`tok:${record.unsub_token}`, hash);
-
-  // 환영 메일이 나가지 않으면 구독을 성립시키지 않는다. 확인 단계가 없는 설계라
-  // (spec §3) 이 메일이 오등록된 사람이 등록 사실을 아는 유일한 통로다. 레코드만
-  // 남고 메일이 안 가면 그 사람은 첫 알림이 올 때까지 모른다.
+  // 메일을 먼저 보내고, 성공했을 때만 레코드를 쓴다. 순서가 반대면 그 사이에
+  // isolate 가 죽거나 롤백이 실패했을 때 "메일 없는 레코드"가 남는데, 확인
+  // 단계가 없는 설계(spec §3)에서 그건 오등록된 사람이 등록 사실을 영영
+  // 모른다는 뜻이다. 반대 방향의 실패(메일은 갔는데 KV 쓰기 실패)는 무해하다 —
+  // 구독됐다고 들었지만 실제로는 아니고, 다시 신청하면 된다.
   try {
     await sendMail(record);
   } catch {
-    await kv.delete(`sub:${hash}`);
-    await kv.delete(`tok:${record.unsub_token}`);
     return { status: 502, body: { error: 'mail_failed' } };
   }
 
-  // 이미 가입된 주소인지를 응답으로 알리지 않는다. 알리면 주소를 하나씩
-  // 넣어보며 "이 사람이 구독자인가"를 확인할 수 있다.
+  await kv.put(`sub:${hash}`, JSON.stringify(record));
+  await kv.put(`tok:${record.unsub_token}`, hash);
+  // 재가입이면 옛 해지 토큰의 역인덱스를 지운다. 안 지우면 tok: 키가 쌓인다.
+  if (prev && prev.unsub_token) {
+    await kv.delete(`tok:${prev.unsub_token}`);
+  }
+
+  // 이미 가입된 주소인지를 응답으로 알리지 않는다.
   return { status: 200, body: { ok: true } };
 }
 
@@ -112,6 +112,12 @@ export async function exportSubscribers(kv) {
   return { status: 200, body: { subscribers, count: subscribers.length } };
 }
 
+// IPv6 는 보통 /64 를 통째로 한 가입자가 쓴다. 전체 주소로 세면 같은 사람이
+// 주소만 바꿔가며 무제한으로 우회한다. 앞 4그룹(=/64)까지만 보고 센다.
+function rateKey(ip) {
+  return ip.includes(':') ? ip.split(':').slice(0, 4).join(':') : ip;
+}
+
 // 같은 IP 의 분당 요청 수를 센다.
 //
 // KV 는 원자적 증가를 지원하지 않으므로, 동시 요청이 같은 값을 읽어 둘 다
@@ -119,8 +125,13 @@ export async function exportSubscribers(kv) {
 // 그 오차를 받아들인다. 정확성이 필요해지면 Durable Object 로 옮긴다.
 //
 // expirationTtl 최소값이 60초라 창(window)이 1분으로 고정된다.
+//
+// 알려진 두 번째 한계: Workers KV 의 get 은 콜로 내에서 캐시되고 기본
+// cacheTtl 이 60초 — 세는 창과 길이가 같다. 캐시된 읽기가 그 사이의 증가를
+// 가릴 수 있다는 뜻이다. 이건 배포 후 실측으로 검증해야 하고, 진짜 방어선은
+// Cloudflare 존 단위 Rate Limiting 규칙이다.
 export async function checkRate(kv, ip, limit = 5) {
-  const key = `rate:${ip}`;
+  const key = `rate:${rateKey(ip)}`;
   const count = Number(await kv.get(key)) || 0;
   if (count >= limit) return false;
   await kv.put(key, String(count + 1), { expirationTtl: 60 });

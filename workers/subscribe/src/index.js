@@ -9,18 +9,21 @@ const ALLOWED_ORIGIN = 'https://aicp-econpilot.github.io';
 const FROM = 'EconPilot <noreply@econpilot.org>';
 
 function corsHeaders(origin) {
-  // 허용 출처일 때만 헤더를 단다. '*' 는 쓰지 않는다 — 남의 사이트가 우리
-  // 창구를 자기 폼처럼 쓰게 된다. (CORS 는 브라우저 규칙일 뿐이라 스크립트
+  // 허용 출처일 때만 Allow-Origin 을 단다. '*' 는 쓰지 않는다 — 남의 사이트가
+  // 우리 창구를 자기 폼처럼 쓰게 된다. (CORS 는 브라우저 규칙일 뿐이라 스크립트
   // 요청은 그대로 통과한다. 실제 방어선은 checkRate 다.)
-  return origin === ALLOWED_ORIGIN
-    ? { 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin' }
-    : {};
+  // Vary: Origin 은 허용 여부와 무관하게 항상 붙인다 — 조건부로 붙이면 "허용
+  // 안 된 출처" 응답이 캐시됐다가 허용된 출처에게 재사용될 수 있다.
+  return {
+    Vary: 'Origin',
+    ...(origin === ALLOWED_ORIGIN ? { 'Access-Control-Allow-Origin': origin } : {}),
+  };
 }
 
-function json(body, status, origin) {
+function json(body, status, origin, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(origin), ...extraHeaders },
   });
 }
 
@@ -35,7 +38,12 @@ function page(title, message, buttonHtml = '') {
 padding:0 1rem;line-height:1.6;color:#1a1a1a}button{font:inherit;padding:.6rem 1.2rem;
 border:0;border-radius:.4rem;background:#c00000;color:#fff;cursor:pointer}</style>
 </head><body><h1>${title}</h1><p>${message}</p>${buttonHtml}</body></html>`,
-    { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+    {
+      status: 200,
+      // 해지 토큰이 쿼리스트링(?t=)에 있다. Referrer 로 새어나가 다른 도메인의
+      // 접속 로그에 남는 일을 막는다.
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Referrer-Policy': 'no-referrer' },
+    },
   );
 }
 
@@ -151,13 +159,14 @@ document.getElementById('go').addEventListener('click', function () {
     if (path === '/api/export' && request.method === 'GET') {
       // 시크릿이 안 걸려 있으면 무조건 거부한다. 없는 채로 비교하면 비교 대상이
       // "Bearer undefined" 라는 문자열이 되어, 그 헤더를 보낸 아무나 통과한다.
+      // 구독자 명단이 걸린 경로라 성공·실패 모두 Cache-Control: no-store 를 단다.
       const expected = env.SUBSCRIBERS_TOKEN;
       const auth = request.headers.get('Authorization') || '';
       if (!expected || auth !== `Bearer ${expected}`) {
-        return json({ error: 'unauthorized' }, 401, origin);
+        return json({ error: 'unauthorized' }, 401, origin, { 'Cache-Control': 'no-store' });
       }
       const result = await exportSubscribers(env.SUBSCRIBERS);
-      return json(result.body, result.status, origin);
+      return json(result.body, result.status, origin, { 'Cache-Control': 'no-store' });
     }
 
     return json({ error: 'not_found' }, 404, origin);
