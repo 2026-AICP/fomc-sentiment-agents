@@ -45,7 +45,7 @@ jobs:
               subject: "EconPilot 발신 점검",
               html: ("<p>EconPilot 메일 발신 경로 점검입니다.</p>"
                      + "<p>보낸 시각: " + $now + "</p>"
-                     + "<p>이 메일이 스팸함으로 갔다면 '스팸 아님'으로 표시해 주세요.</p>")
+                     + "<p>이 메일이 스팸함으로 갔다면 [스팸 아님]으로 표시해 주세요.</p>")
             }' > payload.json
 
           code=$(curl -sS -o resp.json -w '%{http_code}' \
