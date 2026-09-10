@@ -11,4 +11,4 @@ routes = [
 # id 는 `npx wrangler kv namespace create SUBSCRIBERS` 실행 후 채운다.
 [[kv_namespaces]]
 binding = "SUBSCRIBERS"
-id = "PLACEHOLDER_네임스페이스_생성후_채울것"
+id = "1011008951bc4673b9414346a69999fb"
