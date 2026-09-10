@@ -94,9 +94,35 @@ COLUMNS = ["date", "title", "description", "source", "url", "published_at",
 #   두 구간을 **하나의 연속 시계열로 이어 붙이지 않는다.** 경위·영향 측정은
 #   docs/scope_impact.md 참조.
 # F: 연준 자체 — "federal reserve" 또는 fed(=the Fed 포함). 단어경계로 오인 축소.
-_F_RE = re.compile(r"\bfederal reserve\b|\bfed\b", re.IGNORECASE)
-# M(27): 정책·도구 + 의장 성 + 국내외 중앙은행/직위. Volcker 는 교수 표기(Volker)도 함께 매치.
-# ★지도교수 지정 원본(2026-07). 이 목록은 바꾸지 않는다 — 아래 _M_EXT 로만 넓힌다.
+#
+# ★출처(2026-09-10 확인): Husted·Rogers·Sun(2017), "Monetary Policy Uncertainty",
+#   Fed IFDP No.1215 — https://policyuncertainty.com/monetary.html
+#   HRS 는 기사를 세 조건의 교집합으로 고르는데, 그중 **(iii) 연준 식별 조건**이
+#   우리 F그룹에 해당한다:
+#     (iii) "Federal Reserve" or "the Fed" or "Federal Open Market Committee" or "FOMC"
+#   정식 명칭과 약어가 빠져 있어 보강한다. HRS 는 WSJ·NYT·WaPo 를 쓰고 (iii) 언급
+#   기사 수로 스케일링하므로, WSJ 백본에 F 조건을 거는 우리 설정과 가장 가깝다.
+#
+#   ※ FOMC 는 2026-09-10 에 M그룹(_M_EXT)에 넣었다가 여기로 옮겼다 — HRS 가
+#     연준 식별 조건에 두므로 위치상 F 가 맞다. M 에 두면 "FOMC + 다른 M단어"를
+#     요구하게 되어 원 설계보다 좁아진다.
+_F_RE = re.compile(
+    r"\bfederal reserve\b|\bfed\b|"
+    r"\bfederal open market committee\b|\bfomc\b",
+    re.IGNORECASE,
+)
+# M: 정책·도구 + 의장 성 + 국내외 중앙은행/직위. Volcker 는 원문 표기(Volker)도 함께 매치.
+#
+# ★출처: Baker·Bloom·Davis, "Measuring Economic Policy Uncertainty"(2016) 의
+#   MPU 기준 **M 집합 26개** — https://policyuncertainty.com/bbd_monetary.html
+#   그중 "federal reserve"·"the fed" 는 우리 F∧M 구조상 F그룹으로 떼어냈고,
+#   나머지가 여기 있다. 원문 문자 그대로 옮겨 대조가 가능하게 둔다.
+#   ※ yellen·powell·warsh 는 원문에 없다. 사이트 저작권이 2012-2018 이라 그 이후
+#     의장이 빠져 있고, 우리 팀이 이전에 보강해 둔 것이다.
+#
+# ★이 목록은 바꾸지 않는다. 넓힐 일이 있으면 출처가 분명한 별도 층으로 붙인다
+#   (아래 _M_HRS). BBD 는 이 용어집을 2년간 12,009건 인간 판정과 32,000개 조합
+#   비교로 골랐다(논문 §3.1) — 직관으로 더하고 뺄 대상이 아니다.
 _M_BASE = (
     r"money supply|open market operation|quantitative easing|monetary polic|"
     r"fed funds rate|overnight lending rate|interest rate|"
@@ -106,42 +132,47 @@ _M_BASE = (
     r"bank of china|bundesbank|bank of france|bank of italy"
 )
 
-# ── M그룹 확장 (2026-09, 조교 승인) ──────────────────────────────────────────
-# 원본 27개에 통화정책 핵심 표현이 빠져 있어, 정책 기사가 헤드라인 표현 차이만으로
-# 탈락하고 있었다. 예: "NY Fed's Williams attributes a strong economy..."(탈락) 대
-# "Fed's Williams ties rising bond yields to strong economy"(통과) — 거의 같은 기사다.
+# ── 조교 추천분은 제거했다 (2026-09-10) ────────────────────────────────────
+# 한때 아래를 M그룹에 넣었다가 뺐다:
+#   rate hike/cut/decision · Fed meeting · Beige Book · minutes(연준 문맥) ·
+#   FOMC 위원 성 15명(williams, waller, daly, bostic, barkin, kashkari,
+#   goolsbee, mester, bowman, jefferson, cook, logan, schmid, musalem, hammack)
 #
-# 근거(백필 탈락분 중 F만 있는 38,878건 기준 회수량):
-#   rate hike/cut  8,812 · Fed meeting 2,049 · minutes 1,651 · FOMC 667 ·
-#   지역 연은 총재 878 · Beige Book 84   → 합집합 13,102건(34%)
+# 뺀 이유: 지도교수 지침 — 키워드 세트는 신뢰도 있는 연구에 근거하므로 함부로
+#   더하거나 빼지 말고, 손댄다면 타당한 근거를 붙일 것. 위 표현들은 BBD(2016)
+#   에도 HRS(2017) 에도 없어 학술적 출처를 대지 못했다. FOMC 만 HRS 기준 (iii)
+#   에 있어 F그룹으로 옮겨 살아남았다.
 #
-# ★minutes 는 형태를 좁혔다. 단독 \bminutes\b 는 "30 minutes" 류에도 걸린다
-#   (단독 1,854 대 좁힘 1,651 — 차이 232건이 진짜·오탐 혼재라 좁히는 쪽을 택했다).
-# ★tightening/easing/dovish/hawkish 는 이번에 **넣지 않는다**. 범위가 넓어 무관
-#   기사가 다수 들어온다는 판단(조교 의견) — 추가 표본 검토 후 별도로 결정한다.
-# ★FOMC 위원 성(姓): 이사·지역 연은 총재. F(연준)가 함께 요구되므로 조합 정밀도는
-#   높지만, "Thomas Cook (India)" 같은 오탐이 소수 남는다(감사에서 수치화할 것).
+# 규모: 이 제거로 백필 통과가 53,529 → 39,056건(-27.0%)이 된다. 적지 않지만,
+#   근거 없는 확장을 남겨두는 쪽이 더 위험하다고 판단했다.
 #
-# 되돌리기: NEWS_M_EXTENDED=0 → 지도교수 원본 27개만 사용.
-_M_EXT = (
-    r"\bfomc\b|"
-    r"rate (?:hike|cut|decision|increase|reduction)|\brate-(?:hike|cut)\b|"
-    r"fed(?:eral reserve)?\s+(?:policy\s+)?meeting|meeting of the fed|"
-    r"beige book|"
-    # minutes: 연준 문맥이 앞에 붙은 형태만 (소유격 Fed's ... minutes 포함).
-    # 사이 단어 3개까지 허용 — "Fed officials await June minutes",
-    # "Federal Reserve releases June minutes" 를 잡으려면 필요하다.
-    # 실측(F만 있는 탈락분 38,878건): 0~1단어 1,656 / 0~3단어 1,670 / 단독 1,854.
-    # 시간표현 오탐("30 minutes" 류)은 0~1과 0~3이 똑같이 2건, 단독은 29건이다.
-    r"(?:fomc|fed(?:eral reserve)?(?:'s|’s)?|meeting)\s+(?:\w+\s+){0,3}minutes|"
-    r"minutes\s+of\s+the|"
-    r"\b(?:williams|waller|daly|bostic|barkin|kashkari|goolsbee|mester|bowman|"
-    r"jefferson|cook|logan|schmid|musalem|hammack)\b"
-)
+# 되살리려면 git 이력을 보라 — 커밋 f664d54 에 패턴과 실측 근거가 남아 있다.
+#   (rate hike/cut 8,812 · Fed meeting 2,049 · minutes 1,651 · 위원 성 878 ·
+#    Beige Book 84 — F만 있는 탈락분 38,878건 기준 회수량)
+#   되살릴 때는 필터 감사로 정밀도를 재 근거를 만든 뒤에 하는 것이 맞다.
 
-M_EXTENDED = os.getenv("NEWS_M_EXTENDED", "1") not in ("0", "false", "False")
+# ── HRS (ii) 보강 (2026-09-10) ──────────────────────────────────────────────
+# 출처: Husted·Rogers·Sun(2017) Fed IFDP 1215 — 기준 (ii)
+#   "monetary policy(ies)" or "interest rate(s)" or "Federal fund(s) rate"
+#   or "Fed fund(s) rate"
+# 앞의 둘은 _M_BASE 가 이미 덮는다(monetary polic / interest rate).
+# 남는 것은 **연방기금금리의 표기 변형**이다. _M_BASE 에는 BBD 표기 그대로
+# "fed funds rate" 만 있어서 정식 명칭 "federal funds rate" 와 단수형이 안 걸린다.
+#   fed funds rate ✓ / federal funds rate ✗ / fed fund rate ✗ / federal fund rate ✗
+# BBD 논문도 "We also include plurals ... and variants ... in these term sets" 라고
+# 변형 포함을 전제하므로, 이는 개념 추가가 아니라 **표기 누락 보강**이다.
+#
+# ★_M_BASE 를 고치지 않고 층을 나눈 이유: _M_BASE 는 BBD M 집합 26개를 문자 그대로
+#   옮긴 것이라 원문 대조가 가능해야 한다. 출처가 다른 항목을 섞으면 그게 깨진다.
+_M_HRS = r"fed(?:eral)? funds? rate"
+
+HRS_TERMS = os.getenv("NEWS_HRS_TERMS", "1") not in ("0", "false", "False")
+
+# 출처별로 층을 쌓는다 — 끄면 그 층만 빠진다.
+#   _M_BASE  BBD M 집합 26개 (항상)
+#   _M_HRS   HRS (ii) 표기 보강      NEWS_HRS_TERMS=0 으로 해제
 _M_RE = re.compile(
-    f"{_M_BASE}|{_M_EXT}" if M_EXTENDED else _M_BASE,
+    "|".join([_M_BASE] + ([_M_HRS] if HRS_TERMS else [])),
     re.IGNORECASE,
 )
 
