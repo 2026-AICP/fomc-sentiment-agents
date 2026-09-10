@@ -67,7 +67,17 @@ export async function subscribe(kv, sendMail, { email, level }) {
 
   await kv.put(`sub:${hash}`, JSON.stringify(record));
   await kv.put(`tok:${record.unsub_token}`, hash);
-  await sendMail(record);
+
+  // 환영 메일이 나가지 않으면 구독을 성립시키지 않는다. 확인 단계가 없는 설계라
+  // (spec §3) 이 메일이 오등록된 사람이 등록 사실을 아는 유일한 통로다. 레코드만
+  // 남고 메일이 안 가면 그 사람은 첫 알림이 올 때까지 모른다.
+  try {
+    await sendMail(record);
+  } catch {
+    await kv.delete(`sub:${hash}`);
+    await kv.delete(`tok:${record.unsub_token}`);
+    return { status: 502, body: { error: 'mail_failed' } };
+  }
 
   // 이미 가입된 주소인지를 응답으로 알리지 않는다. 알리면 주소를 하나씩
   // 넣어보며 "이 사람이 구독자인가"를 확인할 수 있다.

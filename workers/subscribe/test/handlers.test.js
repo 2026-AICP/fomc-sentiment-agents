@@ -119,6 +119,16 @@ test('subscribe: 비문자열 입력에 터지지 않고 400 을 준다', async 
   assert.equal(sent.length, 0);
 });
 
+test('subscribe: 환영 메일이 실패하면 레코드를 남기지 않는다', async () => {
+  const kv = new FakeKV();
+  const boom = async () => { throw new Error('resend 502'); };
+
+  const res = await subscribe(kv, boom, { email: 'a@x.com', level: 'alert' });
+
+  assert.equal(res.status, 502);
+  assert.equal(kv.store.size, 0);   // sub: 와 tok: 둘 다 없어야 한다
+});
+
 test('unsubscribe: 레코드와 역인덱스를 모두 지운다', async () => {
   const kv = new FakeKV();
   const { sendMail } = collectMail();

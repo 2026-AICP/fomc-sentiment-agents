@@ -24,6 +24,8 @@ function json(body, status, origin) {
   });
 }
 
+// title·message 를 이스케이프 없이 그대로 삽입한다. 반드시 하드코딩된
+// 문자열만 넘길 것 — 요청에서 온 값을 절대 넣지 않는다.
 function page(title, message, buttonHtml = '') {
   return new Response(
     `<!doctype html><html lang="ko"><head><meta charset="utf-8">
@@ -92,6 +94,11 @@ export default {
       } catch {
         return json({ error: 'invalid_json' }, 400, origin);
       }
+      // request.json() 은 리터럴 null·숫자·문자열도 성공시킨다. 객체가 아니면
+      // 아래에서 payload.email 이 터지므로 여기서 걸러낸다.
+      if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+        return json({ error: 'invalid_json' }, 400, origin);
+      }
       const result = await subscribe(
         env.SUBSCRIBERS,
         (record) => sendWelcome(env.RESEND_API_KEY, record),
@@ -142,8 +149,11 @@ document.getElementById('go').addEventListener('click', function () {
     }
 
     if (path === '/api/export' && request.method === 'GET') {
+      // 시크릿이 안 걸려 있으면 무조건 거부한다. 없는 채로 비교하면 비교 대상이
+      // "Bearer undefined" 라는 문자열이 되어, 그 헤더를 보낸 아무나 통과한다.
+      const expected = env.SUBSCRIBERS_TOKEN;
       const auth = request.headers.get('Authorization') || '';
-      if (auth !== `Bearer ${env.SUBSCRIBERS_TOKEN}`) {
+      if (!expected || auth !== `Bearer ${expected}`) {
         return json({ error: 'unauthorized' }, 401, origin);
       }
       const result = await exportSubscribers(env.SUBSCRIBERS);
