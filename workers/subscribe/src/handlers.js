@@ -31,3 +31,45 @@ export function randomToken() {
   crypto.getRandomValues(bytes);
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+// 구독 접수. 확인 메일 단계는 없다 — 넣는 즉시 명단에 들어간다(spec §3).
+// 그래서 환영 메일이 선택이 아니다: 오등록된 사람이 자기가 등록됐음을 아는
+// 유일한 통로다.
+export async function subscribe(kv, sendMail, { email, level }) {
+  // 정규화를 먼저 한다. 붙여넣기한 주소에 앞뒤 공백이 붙는 일이 흔한데,
+  // isValidEmail 은 공백을 거부하므로 원본을 그대로 검증하면 멀쩡한 주소가
+  // 막힌다. isValidEmail 은 표준형에 대해 엄격한 채로 둔다 — 안에서 trim 하면
+  // 검증과 정규화 두 일을 겸하게 된다.
+  const normalized = typeof email === 'string' ? normalizeEmail(email) : '';
+  if (!isValidEmail(normalized)) {
+    return { status: 400, body: { error: 'invalid_email' } };
+  }
+
+  const hash = await sha256Hex(normalized);
+
+  // 재가입이면 옛 해지 토큰의 역인덱스를 먼저 지운다. 안 지우면 tok: 키가
+  // 영원히 쌓이고, 옛 링크로도 해지가 된다.
+  const prev = await kv.get(`sub:${hash}`, 'json');
+  if (prev && prev.unsub_token) {
+    await kv.delete(`tok:${prev.unsub_token}`);
+  }
+
+  const record = {
+    id: crypto.randomUUID(),
+    channel: 'email',
+    email: normalized,
+    level: LEVELS.includes(level) ? level : 'alert',
+    fed_events: true,
+    overnight: true,
+    created_at: new Date().toISOString(),
+    unsub_token: randomToken(),
+  };
+
+  await kv.put(`sub:${hash}`, JSON.stringify(record));
+  await kv.put(`tok:${record.unsub_token}`, hash);
+  await sendMail(record);
+
+  // 이미 가입된 주소인지를 응답으로 알리지 않는다. 알리면 주소를 하나씩
+  // 넣어보며 "이 사람이 구독자인가"를 확인할 수 있다.
+  return { status: 200, body: { ok: true } };
+}
