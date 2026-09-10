@@ -1,0 +1,14 @@
+name = "econpilot-subscribe"
+main = "src/index.js"
+compatibility_date = "2026-09-10"
+
+# 라우트는 econpilot.org 아래에 둔다. 수신거부 링크가 메일 발신 도메인과
+# 같아야 스팸 필터가 피싱 패턴으로 보지 않는다 (spec §5).
+routes = [
+  { pattern = "econpilot.org/api/*", zone_name = "econpilot.org" }
+]
+
+# id 는 `npx wrangler kv namespace create SUBSCRIBERS` 실행 후 채운다.
+[[kv_namespaces]]
+binding = "SUBSCRIBERS"
+id = "PLACEHOLDER_네임스페이스_생성후_채울것"
