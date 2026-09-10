@@ -101,3 +101,18 @@ export async function exportSubscribers(kv) {
   } while (cursor);
   return { status: 200, body: { subscribers, count: subscribers.length } };
 }
+
+// 같은 IP 의 분당 요청 수를 센다.
+//
+// KV 는 원자적 증가를 지원하지 않으므로, 동시 요청이 같은 값을 읽어 둘 다
+// 통과할 수 있다. 정확한 차단이 아니라 대량 유입을 늦추는 것이 목적이므로
+// 그 오차를 받아들인다. 정확성이 필요해지면 Durable Object 로 옮긴다.
+//
+// expirationTtl 최소값이 60초라 창(window)이 1분으로 고정된다.
+export async function checkRate(kv, ip, limit = 5) {
+  const key = `rate:${ip}`;
+  const count = Number(await kv.get(key)) || 0;
+  if (count >= limit) return false;
+  await kv.put(key, String(count + 1), { expirationTtl: 60 });
+  return true;
+}

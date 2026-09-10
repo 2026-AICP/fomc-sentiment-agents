@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isValidEmail, normalizeEmail, sha256Hex, randomToken, LEVELS, subscribe,
-  unsubscribe, exportSubscribers,
+  unsubscribe, exportSubscribers, checkRate,
 } from '../src/handlers.js';
 import { FakeKV } from './fake-kv.js';
 
@@ -167,4 +167,20 @@ test('exportSubscribers: 아무도 없으면 빈 배열', async () => {
   const res = await exportSubscribers(new FakeKV());
   assert.equal(res.body.count, 0);
   assert.deepEqual(res.body.subscribers, []);
+});
+
+test('checkRate: 한도까지는 통과, 넘으면 막는다', async () => {
+  const kv = new FakeKV();
+  for (let i = 0; i < 5; i += 1) {
+    assert.equal(await checkRate(kv, '1.2.3.4'), true, `${i + 1}번째는 통과해야 한다`);
+  }
+  assert.equal(await checkRate(kv, '1.2.3.4'), false);
+});
+
+test('checkRate: IP 마다 따로 센다', async () => {
+  const kv = new FakeKV();
+  for (let i = 0; i < 5; i += 1) await checkRate(kv, '1.2.3.4');
+
+  assert.equal(await checkRate(kv, '1.2.3.4'), false);
+  assert.equal(await checkRate(kv, '5.6.7.8'), true);
 });
