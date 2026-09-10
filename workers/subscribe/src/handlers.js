@@ -73,3 +73,31 @@ export async function subscribe(kv, sendMail, { email, level }) {
   // 넣어보며 "이 사람이 구독자인가"를 확인할 수 있다.
   return { status: 200, body: { ok: true } };
 }
+
+// 해지. 즉시 삭제하고 보관하지 않는다 (notification_design.md §6-3).
+export async function unsubscribe(kv, token) {
+  const hash = await kv.get(`tok:${token}`);
+  if (!hash) {
+    // 이미 해지했거나 토큰이 틀렸다. 둘을 구분해 알리지 않는다.
+    return { status: 404, body: { error: 'not_found' } };
+  }
+  await kv.delete(`sub:${hash}`);
+  await kv.delete(`tok:${token}`);
+  return { status: 200, body: { ok: true } };
+}
+
+// GitHub Actions 가 발송 대상을 읽는 경로.
+// 실제 KV 의 list() 는 1000건씩 끊어 주므로 cursor 를 따라 끝까지 돈다.
+export async function exportSubscribers(kv) {
+  const subscribers = [];
+  let cursor;
+  do {
+    const page = await kv.list({ prefix: 'sub:', cursor });
+    for (const key of page.keys) {
+      const record = await kv.get(key.name, 'json');
+      if (record) subscribers.push(record);
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return { status: 200, body: { subscribers, count: subscribers.length } };
+}

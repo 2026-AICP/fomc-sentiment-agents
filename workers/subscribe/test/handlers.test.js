@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isValidEmail, normalizeEmail, sha256Hex, randomToken, LEVELS, subscribe,
+  unsubscribe, exportSubscribers,
 } from '../src/handlers.js';
 import { FakeKV } from './fake-kv.js';
 
@@ -116,4 +117,54 @@ test('subscribe: 비문자열 입력에 터지지 않고 400 을 준다', async 
   }
   assert.equal(kv.store.size, 0);
   assert.equal(sent.length, 0);
+});
+
+test('unsubscribe: 레코드와 역인덱스를 모두 지운다', async () => {
+  const kv = new FakeKV();
+  const { sendMail } = collectMail();
+  await subscribe(kv, sendMail, { email: 'a@x.com', level: 'alert' });
+  const rec = await kv.get(`sub:${await sha256Hex('a@x.com')}`, 'json');
+
+  const res = await unsubscribe(kv, rec.unsub_token);
+
+  assert.equal(res.status, 200);
+  assert.equal(kv.store.size, 0);   // 보관하지 않는다
+});
+
+test('unsubscribe: 모르는 토큰은 404', async () => {
+  const kv = new FakeKV();
+  const res = await unsubscribe(kv, 'deadbeef');
+  assert.equal(res.status, 404);
+});
+
+test('unsubscribe: 두 번 눌러도 터지지 않는다', async () => {
+  const kv = new FakeKV();
+  const { sendMail } = collectMail();
+  await subscribe(kv, sendMail, { email: 'a@x.com', level: 'alert' });
+  const rec = await kv.get(`sub:${await sha256Hex('a@x.com')}`, 'json');
+
+  await unsubscribe(kv, rec.unsub_token);
+  const second = await unsubscribe(kv, rec.unsub_token);
+
+  assert.equal(second.status, 404);
+});
+
+test('exportSubscribers: sub: 키만 모아 반환한다', async () => {
+  const kv = new FakeKV();
+  const { sendMail } = collectMail();
+  await subscribe(kv, sendMail, { email: 'a@x.com', level: 'alert' });
+  await subscribe(kv, sendMail, { email: 'b@x.com', level: 'caution' });
+
+  const res = await exportSubscribers(kv);
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.count, 2);
+  const emails = res.body.subscribers.map((s) => s.email).sort();
+  assert.deepEqual(emails, ['a@x.com', 'b@x.com']);
+});
+
+test('exportSubscribers: 아무도 없으면 빈 배열', async () => {
+  const res = await exportSubscribers(new FakeKV());
+  assert.equal(res.body.count, 0);
+  assert.deepEqual(res.body.subscribers, []);
 });
