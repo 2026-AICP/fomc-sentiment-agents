@@ -96,13 +96,52 @@ COLUMNS = ["date", "title", "description", "source", "url", "published_at",
 # F: 연준 자체 — "federal reserve" 또는 fed(=the Fed 포함). 단어경계로 오인 축소.
 _F_RE = re.compile(r"\bfederal reserve\b|\bfed\b", re.IGNORECASE)
 # M(27): 정책·도구 + 의장 성 + 국내외 중앙은행/직위. Volcker 는 교수 표기(Volker)도 함께 매치.
-_M_RE = re.compile(
+# ★지도교수 지정 원본(2026-07). 이 목록은 바꾸지 않는다 — 아래 _M_EXT 로만 넓힌다.
+_M_BASE = (
     r"money supply|open market operation|quantitative easing|monetary polic|"
     r"fed funds rate|overnight lending rate|interest rate|"
     r"lender of last resort|discount window|central bank|fed chair(?:man)?|"
     r"bernanke|vol[ck]+er|greenspan|yellen|powell|\bwarsh\b|"
     r"european central bank|\becb\b|bank of england|bank of japan|\bboj\b|"
-    r"bank of china|bundesbank|bank of france|bank of italy",
+    r"bank of china|bundesbank|bank of france|bank of italy"
+)
+
+# ── M그룹 확장 (2026-09, 조교 승인) ──────────────────────────────────────────
+# 원본 27개에 통화정책 핵심 표현이 빠져 있어, 정책 기사가 헤드라인 표현 차이만으로
+# 탈락하고 있었다. 예: "NY Fed's Williams attributes a strong economy..."(탈락) 대
+# "Fed's Williams ties rising bond yields to strong economy"(통과) — 거의 같은 기사다.
+#
+# 근거(백필 탈락분 중 F만 있는 38,878건 기준 회수량):
+#   rate hike/cut  8,812 · Fed meeting 2,049 · minutes 1,651 · FOMC 667 ·
+#   지역 연은 총재 878 · Beige Book 84   → 합집합 13,102건(34%)
+#
+# ★minutes 는 형태를 좁혔다. 단독 \bminutes\b 는 "30 minutes" 류에도 걸린다
+#   (단독 1,854 대 좁힘 1,651 — 차이 232건이 진짜·오탐 혼재라 좁히는 쪽을 택했다).
+# ★tightening/easing/dovish/hawkish 는 이번에 **넣지 않는다**. 범위가 넓어 무관
+#   기사가 다수 들어온다는 판단(조교 의견) — 추가 표본 검토 후 별도로 결정한다.
+# ★FOMC 위원 성(姓): 이사·지역 연은 총재. F(연준)가 함께 요구되므로 조합 정밀도는
+#   높지만, "Thomas Cook (India)" 같은 오탐이 소수 남는다(감사에서 수치화할 것).
+#
+# 되돌리기: NEWS_M_EXTENDED=0 → 지도교수 원본 27개만 사용.
+_M_EXT = (
+    r"\bfomc\b|"
+    r"rate (?:hike|cut|decision|increase|reduction)|\brate-(?:hike|cut)\b|"
+    r"fed(?:eral reserve)?\s+(?:policy\s+)?meeting|meeting of the fed|"
+    r"beige book|"
+    # minutes: 연준 문맥이 앞에 붙은 형태만 (소유격 Fed's ... minutes 포함).
+    # 사이 단어 3개까지 허용 — "Fed officials await June minutes",
+    # "Federal Reserve releases June minutes" 를 잡으려면 필요하다.
+    # 실측(F만 있는 탈락분 38,878건): 0~1단어 1,656 / 0~3단어 1,670 / 단독 1,854.
+    # 시간표현 오탐("30 minutes" 류)은 0~1과 0~3이 똑같이 2건, 단독은 29건이다.
+    r"(?:fomc|fed(?:eral reserve)?(?:'s|’s)?|meeting)\s+(?:\w+\s+){0,3}minutes|"
+    r"minutes\s+of\s+the|"
+    r"\b(?:williams|waller|daly|bostic|barkin|kashkari|goolsbee|mester|bowman|"
+    r"jefferson|cook|logan|schmid|musalem|hammack)\b"
+)
+
+M_EXTENDED = os.getenv("NEWS_M_EXTENDED", "1") not in ("0", "false", "False")
+_M_RE = re.compile(
+    f"{_M_BASE}|{_M_EXT}" if M_EXTENDED else _M_BASE,
     re.IGNORECASE,
 )
 
