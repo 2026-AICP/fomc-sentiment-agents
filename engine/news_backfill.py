@@ -51,8 +51,13 @@ REJECTED = ROOT / "data" / "news" / "rejected_backfill.csv"
 STATE = ROOT / "data" / "news" / "backfill_state.json"
 
 DEFAULT_FROM, DEFAULT_TO = "2021-06", "2026-06"
-MAX_RESULT_SET = 20000      # Marketaux 하드 상한 — 넘으면 구간을 더 쪼갠다
-MAX_PAGES = 400             # 20,000 / PER_PAGE(50). 안전 상한
+# ★Marketaux 페이지네이션 하드 상한 = **200쪽 = 10,000건**. 넘으면 구간을 쪼갠다.
+#   2026-09-10 실측: page 200 은 50건 정상, page 201 은 HTTP 400
+#   (malformed_parameters — "The limit, page parameter(s) are incorrect").
+#   이전 값 20000/400 은 근거 없는 추정이었고, 그래서 매칭 10,813건이던 2023-03 이
+#   10,000건에서 잘리고도 분할되지 않아 813건을 놓쳤다("3쪽 연속 실패"로만 보였다).
+MAX_RESULT_SET = 10000
+MAX_PAGES = 200             # 10,000 / PER_PAGE(50)
 # 컬럼은 news_scrape.COLUMNS 를 그대로 쓴다 — 두 곳에 적어두면 어긋난다
 # (2026-09 snippet·keywords 추가 때 실제로 갈릴 뻔했다).
 
