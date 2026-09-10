@@ -1,0 +1,63 @@
+name: Warm-up email
+
+# 발신 평판 예열용 수동 발송. **구독자 알림이 아니다** — 팀 내부 주소로만 보낸다.
+#
+# 새로 산 도메인은 전송 이력이 없어서, 어느 날 갑자기 여러 명에게 보내면 받는 쪽
+# 메일 서버가 스팸으로 분류한다. 며칠에 걸쳐 소량씩 보내 "정상적으로 쓰이는
+# 도메인"이라는 기록을 만들어 둔다.
+#   1일차 본인 1통 → 2~3일차 팀원 4명 → 이후 며칠 소량
+#
+# agents/notifier.py 는 건드리지 않는다. 그쪽은 여전히 드라이런이고,
+# tests/test_notifier_node.py 의 "발송 모듈 import 금지" 잠금도 그대로다.
+# 실제 알림 발송은 θ 재보정(B-1)까지 끝난 뒤에 켠다.
+on:
+  workflow_dispatch:
+    inputs:
+      to:
+        description: '받는 주소 (쉼표로 여러 명)'
+        required: true
+      from:
+        description: '보내는 주소'
+        required: true
+        default: 'noreply@econpilot.org'
+
+permissions: {}                   # 저장소를 읽거나 쓰지 않는다
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send via Resend
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          # 입력값은 env 로 넘긴다. 스크립트 안에 ${{ }} 를 직접 쓰면 받는 주소에
+          # 셸 메타문자를 넣어 명령을 주입할 수 있다.
+          MAIL_TO: ${{ inputs.to }}
+          MAIL_FROM: ${{ inputs.from }}
+        run: |
+          set -euo pipefail
+
+          jq -n --arg from "$MAIL_FROM" --arg to "$MAIL_TO" \
+                --arg now "$(date -u '+%Y-%m-%d %H:%M UTC')" '
+            {
+              from: $from,
+              to: ($to | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))),
+              subject: "EconPilot 발신 점검",
+              html: ("<p>EconPilot 메일 발신 경로 점검입니다.</p>"
+                     + "<p>보낸 시각: " + $now + "</p>"
+                     + "<p>이 메일이 스팸함으로 갔다면 '스팸 아님'으로 표시해 주세요.</p>")
+            }' > payload.json
+
+          code=$(curl -sS -o resp.json -w '%{http_code}' \
+            -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d @payload.json)
+
+          if [ "$code" -ge 300 ]; then
+            echo "발송 실패 (HTTP $code)"
+            cat resp.json
+            exit 1
+          fi
+
+          echo "발송 성공 — id: $(jq -r '.id' resp.json)"
