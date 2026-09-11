@@ -13,6 +13,7 @@ from agents.notifier import (
     SUP_ALREADY_SENT,
     SUP_BELOW_LEVEL,
     SUP_NO_ARTICLES,
+    SUP_NO_MARKET,
     SUP_NOT_ACTIONABLE,
     SUP_NOT_TODAY,
     SUP_UNCHANGED,
@@ -79,6 +80,21 @@ def test_correction_silent_when_grade_same():
 
 def test_correction_none_without_final():
     assert decide_correction("2026-07-29", GRADE_ALERT, "", TODAY) is None
+
+# --- §4 시장 데이터 없는 날 -------------------------------------------------
+def test_no_market_suppresses(tmp_path):
+    """주말·휴장일·수집실패 — 비교할 시장이 없으면 보내지 않는다."""
+    d = decide(TODAY, GRADE_ALERT, ["divergence"], has_market=False, **OK)
+    assert not d.send and d.suppressed == SUP_NO_MARKET
+
+def test_no_market_checked_before_grade():
+    """등급보다 먼저 본다 — 로그에 '휴장'이 아니라 '등급'이 남으면 빈도를 못 읽는다."""
+    d = decide(TODAY, GRADE_ALIGNED, [], has_market=False, **OK)
+    assert d.suppressed == SUP_NO_MARKET      # grade_not_actionable 이 아니라
+
+def test_market_present_still_sends():
+    d = decide(TODAY, GRADE_ALERT, ["divergence"], has_market=True, **OK)
+    assert d.send and d.suppressed is None
 
 def test_correction_silent_when_neither_grade_is_alert():
     """전후 어느 쪽도 🔴 이 아니면 정정을 보내지 않는다.

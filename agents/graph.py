@@ -428,7 +428,8 @@ def notifier_node(state: State) -> State:
     d = nt.decide(state["date"], sig.get("grade", "—"), sig.get("fired") or [],
                   sig.get("n_articles"), sig.get("ci_lo"), sig.get("ci_hi"),
                   today=today, sent=sent, details=sig.get("details"),
-                  news_only=not state["statement_path"])
+                  news_only=not state["statement_path"],
+                  has_market=bool(state.get("market")))
     nt.append_log(d)
     if d.send:
         subject, _ = nt.render(d)

@@ -36,6 +36,7 @@ CHANNEL_DRYRUN = "dryrun"
 # 억제 사유 — 고정 코드. 새 사유가 필요하면 여기 상수를 늘린다(자유 문자열 금지).
 SUP_NOT_TODAY = "not_today"              # §4 소급 발송 금지
 SUP_NO_ARTICLES = "no_articles"          # §4 수집 실패일
+SUP_NO_MARKET = "no_market_data"         # 주말·휴장일·시장 수집 실패 — 비교 대상 없음
 SUP_NOT_ACTIONABLE = "grade_not_actionable"   # §4 ⚪ 관망·중립·🟢 정합
 SUP_BELOW_LEVEL = "level_below_alert"    # §2-1 기본값 🔴, ⚠️ 는 구독자 옵트다운
 SUP_ALREADY_SENT = "already_sent"        # 같은 날짜·종류 재발송 금지
@@ -82,7 +83,8 @@ def confidence_label(n_articles, ci_lo, ci_hi) -> str:
 
 
 def decide(date, grade, fired, n_articles, ci_lo, ci_hi, today,
-           level=LEVEL_ALERT, sent=(), details=None, news_only=False) -> Decision:
+           level=LEVEL_ALERT, sent=(), details=None, news_only=False,
+           has_market=True) -> Decision:
     """일별 신호 알림을 보낼지. 순수 함수 — sent 는 이미 발송된 (date, kind) 집합."""
     d = Decision(date=date, kind="signal", grade=grade, fired=list(fired or []),
                  send=False, details=list(details or []),
@@ -95,6 +97,19 @@ def decide(date, grade, fired, n_articles, ci_lo, ci_hi, today,
         d.suppressed = SUP_ALREADY_SENT
     elif not n_articles:                           # §4 수집 실패일(0건·None)
         d.suppressed = SUP_NO_ARTICLES
+    elif not has_market:
+        # 시장 데이터가 없는 날. 주말·미국 휴장일·수집 실패 셋을 구분하지 않는다 —
+        # 로그에 쓸 수 있는 것은 "비교할 시장이 없었다"까지이고, 셋 다 보내지
+        # 않을 이유로는 같다. 알림은 톤을 시장 반응과 견주는 것이라 견줄 것이
+        # 없으면 성립하지 않는다.
+        #
+        # 등급 판정보다 **앞**에 둔다. 뒤에 두면 🟢·⚪ 인 휴장일이
+        # grade_not_actionable 로 먼저 걸려 휴장이었다는 사실이 로그에서 사라진다.
+        # 이 로그는 발송 빈도를 읽으려고 남기는 것이므로 사유가 정확해야 한다.
+        #
+        # 실질적으로 걸리는 것은 ⚠️ 뿐이다 — divergence 는 |시장반응| ≥ 0.80% 를
+        # 요구하므로 휴장일엔 애초에 켜지지 않는다. 그래도 등급과 무관하게 막는다.
+        d.suppressed = SUP_NO_MARKET
     elif grade not in (GRADE_ALERT, GRADE_CAUTION):    # ⚪ 관망·중립·🟢 정합
         d.suppressed = SUP_NOT_ACTIONABLE
     elif grade == GRADE_CAUTION and level == LEVEL_ALERT:

@@ -9,8 +9,10 @@ from agents import graph, notifier as nt
 from analysis.signals import GRADE_ALERT, GRADE_ALIGNED, GRADE_CAUTION
 
 
-def _state(date, grade, fired, n_articles=40, statement=""):
+def _state(date, grade, fired, n_articles=40, statement="", market=True):
+    """market=False 면 주말·휴장일·시장 수집 실패를 흉내낸다(§4 no_market_data)."""
     return {"date": date, "statement_path": statement, "fed_final": False, "log": [],
+            "market": {"spx_ret_cc": -0.85, "vix_chg": 1.2} if market else {},
             "signals": {"grade": grade, "fired": fired, "gate_reason": None,
                         "details": ["⚠️ 괴리 — 연준 톤 긍정(+0.202) vs 시장 급락(-0.85%)"],
                         "n_articles": n_articles, "ci_lo": -0.10, "ci_hi": 0.20}}
@@ -57,6 +59,12 @@ def test_rerun_same_day_does_not_duplicate_a_send(tmp_path, monkeypatch):
     graph.notifier_node(dict(st, log=[]))
     rows = _rows(p)
     assert [r["suppressed_reason"] for r in rows] == ["", nt.SUP_ALREADY_SENT]
+
+def test_weekend_logs_no_market_row(tmp_path, monkeypatch):
+    """시장 데이터가 없는 날은 등급과 무관하게 막힌다 — 2026-08-22 는 토요일."""
+    p = _today(monkeypatch, tmp_path, "2026-08-22")
+    graph.notifier_node(_state("2026-08-22", GRADE_ALERT, ["divergence"], market=False))
+    assert _rows(p)[0]["suppressed_reason"] == nt.SUP_NO_MARKET
 
 
 def test_backfilled_date_is_never_sent(tmp_path, monkeypatch):
