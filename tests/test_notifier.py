@@ -20,7 +20,7 @@ from agents.notifier import (
     confidence_label,
     decide,
     decide_correction,
-    read_log,
+    read_sent,
     render,
 )
 from analysis.signals import GRADE_ALERT, GRADE_ALIGNED, GRADE_CAUTION, GRADE_NEUTRAL, GRADE_WATCH
@@ -79,6 +79,20 @@ def test_correction_silent_when_grade_same():
 
 def test_correction_none_without_final():
     assert decide_correction("2026-07-29", GRADE_ALERT, "", TODAY) is None
+
+def test_correction_silent_when_neither_grade_is_alert():
+    """전후 어느 쪽도 🔴 이 아니면 정정을 보내지 않는다.
+
+    원본이 ⚠️ 였다면 기본 발송 등급(🔴)에 미달해 애초에 나가지 않았다.
+    나가지도 않은 알림의 정정을 보내면 받는 쪽에 맥락이 없다.
+    """
+    d = decide_correction("2026-07-29", GRADE_CAUTION, GRADE_ALIGNED, TODAY)
+    assert not d.send and d.suppressed == SUP_NOT_ACTIONABLE
+
+def test_correction_sends_when_final_becomes_alert():
+    """확정판에서 🔴 이 되면 보낸다 — 원본이 🔴 이 아니었어도."""
+    d = decide_correction("2026-07-29", GRADE_ALIGNED, GRADE_ALERT, TODAY)
+    assert d.send and d.suppressed is None
 
 
 # --- §5 신뢰도 라벨 (data.js confidenceLevel() 과 같은 규칙) ------------------
@@ -150,10 +164,33 @@ def test_log_writes_sent_and_suppressed_rows(tmp_path):
     assert [r["suppressed_reason"] for r in rows] == ["", SUP_BELOW_LEVEL]
     assert rows[0]["channel"] == "dryrun" and rows[0]["n_recipients"] == "0"
     assert rows[0]["fired"] == "divergence;tone_vs_vix"
-    assert read_log(p) == {(TODAY, "signal")}
+    assert read_sent(p) == {(TODAY, "signal")}
 
 def test_log_appends_without_overwriting(tmp_path):
     p = tmp_path / "notification_log.csv"
     append_log(decide(TODAY, GRADE_ALERT, ["divergence"], **OK), path=p)
     append_log(decide_correction("2026-07-29", GRADE_ALERT, GRADE_ALIGNED, TODAY), path=p)
     assert len(list(csv.DictReader(open(p, encoding="utf-8")))) == 2
+
+def test_read_sent_ignores_suppressed_rows(tmp_path):
+    """억제된 행은 '보냈다'로 치지 않는다.
+
+    오전에 수집이 실패해 no_articles 로 한 줄 남은 날, 오후에 재실행하면
+    already_sent 로 막히던 버그. 한 통도 안 나갔는데 그날 복구가 불가능했다.
+    """
+    p = tmp_path / "notification_log.csv"
+    append_log(decide(TODAY, GRADE_ALERT, ["divergence"], n_articles=0,
+                      ci_lo=-0.1, ci_hi=0.2, today=TODAY), path=p)
+    assert read_sent(p) == set()          # 억제된 행뿐 → 비어 있어야 한다
+
+    d = decide(TODAY, GRADE_ALERT, ["divergence"], sent=read_sent(p), **OK)
+    assert d.send, "억제만 기록된 날은 재실행에서 발송돼야 한다"
+
+def test_read_sent_blocks_real_duplicate(tmp_path):
+    """실제로 나간 날은 여전히 막는다 — 중복 발송 방지는 유지."""
+    p = tmp_path / "notification_log.csv"
+    append_log(decide(TODAY, GRADE_ALERT, ["divergence"], **OK), path=p)
+    assert read_sent(p) == {(TODAY, "signal")}
+
+    d = decide(TODAY, GRADE_ALERT, ["divergence"], sent=read_sent(p), **OK)
+    assert not d.send and d.suppressed == SUP_ALREADY_SENT

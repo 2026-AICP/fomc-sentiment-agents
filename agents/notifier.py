@@ -5,7 +5,7 @@
 한 행뿐이고, 인프라(§10-2~4)가 붙은 뒤에 send() 를 얹는다.
 
 판정(decide·decide_correction)과 렌더(render)는 **순수 함수**다. 네트워크·DB·파일에
-의존하지 않으므로 단위테스트가 결정적이다. 파일을 만지는 것은 append_log·read_log 뿐.
+의존하지 않으므로 단위테스트가 결정적이다. 파일을 만지는 것은 append_log·read_sent 뿐.
 
 로그는 리포에 커밋된다(§7-1). 리포가 PUBLIC 이고 히스토리는 지워도 남으므로:
   · 구독자 식별 정보는 어떤 필드에도 넣지 않는다 — n_recipients 는 '수' 하나뿐이다
@@ -105,7 +105,7 @@ def decide(date, grade, fired, n_articles, ci_lo, ci_hi, today,
 
 
 def decide_correction(date, grade, grade_final, today, sent=()) -> Optional[Decision]:
-    """§2-3 정정 알림 — grade_final 이 grade 와 **다를 때만**.
+    """§2-3 정정 알림 — grade_final 이 grade 와 **다르고**, 전후 중 하나가 🔴 일 때만.
 
     회의록이 3주 뒤 도착해 과거 등급이 바뀌는 경우다. 소급 발송 금지(§4)의 예외가
     아니다 — 정정을 '오늘 알게 된 사실'로 보내므로 date 는 원래 신호일이지만 발송
@@ -119,6 +119,11 @@ def decide_correction(date, grade, grade_final, today, sent=()) -> Optional[Deci
         d.suppressed = SUP_ALREADY_SENT
     elif grade_final == grade:
         d.suppressed = SUP_UNCHANGED
+    elif GRADE_ALERT not in (grade, grade_final):
+        # 전후 어느 쪽도 🔴 이 아니면 보내지 않는다. 원본이 ⚠️ 였다면 기본 발송
+        # 등급(§2-1)에 미달해 애초에 나가지 않았고, 나가지도 않은 알림의 정정은
+        # 받는 쪽에 맥락이 없다. 반대로 확정판이 🔴 이면 원본과 무관하게 보낸다.
+        d.suppressed = SUP_NOT_ACTIONABLE
     else:
         d.send = True
     return d
@@ -166,19 +171,33 @@ def render(d: Decision) -> tuple:
     return subject, "\n".join(lines)
 
 
-def read_log(path=None) -> set:
-    """이미 기록된 (date, kind) 집합. 파일이 없으면 빈 집합."""
+def read_sent(path=None) -> set:
+    """**실제로 나간** (date, kind) 집합. 파일이 없으면 빈 집합.
+
+    억제된 행(`suppressed_reason` 이 있는 행)은 세지 않는다. append_log 는
+    안 보낸 날도 사유와 함께 남기므로(§7-1), 기록된 행을 전부 '보냈다'로 치면
+    **한 통도 안 나간 날이 재실행에서 already_sent 로 막힌다** — 오전에 수집이
+    실패해 no_articles 로 한 줄 남으면 오후 재실행으로 복구할 수 없었다.
+
+    채널로는 거르지 않는다. 드라이런에서도 "보냈을 날"은 중복 기록을 막아야
+    발송을 켠 뒤와 같은 규칙으로 돈다.
+    """
     p = Path(path or NOTIFICATION_LOG)
     if not p.exists():
         return set()
     with open(p, encoding="utf-8") as f:
-        return {(r["date"], r["kind"]) for r in csv.DictReader(f)}
+        return {(r["date"], r["kind"]) for r in csv.DictReader(f)
+                if not r["suppressed_reason"]}
 
 
 def append_log(d: Decision, path=None, channel=CHANNEL_DRYRUN) -> None:
     """§7-1 발송 로그 1행 append. 억제된 날도 남긴다 — 사유가 있어야 빈도가 읽힌다.
 
     덮어쓰지 않는다(질문 6 원칙의 연장). 개인 식별 정보는 어떤 컬럼에도 없다.
+
+    **하루 1행은 정상 운영 시의 관찰이지 불변식이 아니다.** 억제된 날을 같은 날
+    재실행하면 행이 하나 더 쌓인다(read_sent 참조) — 두 번 시도한 사실이 남는
+    것이므로 맞는 동작이다. 발송 빈도를 셀 때는 (date, kind) 로 중복을 제거할 것.
     """
     p = Path(path or NOTIFICATION_LOG)
     p.parent.mkdir(parents=True, exist_ok=True)
