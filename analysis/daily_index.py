@@ -31,6 +31,7 @@ sys.path.insert(0, str(ROOT))
 
 from analysis.analyze_alignment import fed_composite_asof
 from analysis.headline import combine, _axis_stats, _z
+from analysis.news_index_live import NEWS_LIVE_FROM
 
 DB = ROOT / "data" / "fomc.db"           # 통일 DB (에이전트·pipeline 과 공유)
 NEWS_CSV = ROOT / "outputs" / "news_index_live.csv"
@@ -73,6 +74,12 @@ def build_daily(news_csv=NEWS_CSV, out=OUT):
     if not Path(news_csv).exists():
         raise SystemExit(f"News 지수 CSV 없음: {news_csv}\n먼저 agents/news_scheduler.py 실행")
     news = pd.read_csv(news_csv)
+    # 수집 초기(07-03~07-09)는 버린다 — 뉴스 페이지는 이미 빼고 있었는데
+    # 통합지수만 넣고 있었다. 사유와 경계값은 news_index_live.NEWS_LIVE_FROM.
+    before = len(news)
+    news = news[news["date"].astype(str) >= NEWS_LIVE_FROM]
+    if before != len(news):
+        print(f"  수집 초기 {before - len(news)}일 제외 ({NEWS_LIVE_FROM} 이전)")
     fed_series = load_fed_series()
     rows = []
     for _, r in news.iterrows():
