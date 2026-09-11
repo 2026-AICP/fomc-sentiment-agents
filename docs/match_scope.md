@@ -331,5 +331,70 @@ minutes(좁힌 형태) · FOMC 위원 성 15명
 python -m pytest tests/test_news_match_fields.py -q
 ```
 
+---
+
+## F그룹 질의어 누락 규모 (2026-09-11 실측)
+
+HRS(2017) (iii) 에 따라 `FOMC`·`Federal Open Market Committee` 를 F그룹에
+넣었지만, **API 질의어에는 안 들어가 있습니다.**
+
+```
+QUERY = '"federal reserve" | fed'
+```
+
+따라서 FOMC 만 있고 fed 가 없는 기사는 회수된 적이 없습니다. 통과분에도
+탈락분에도 없으므로 기존 데이터로는 잴 수 없고, 질의를 새로 던져야 합니다
+(`scripts/probe_fomc_query.py`). 316,745개 URL 과 대조한 결과입니다.
+
+| 구간 | 회수 | 코퍼스에 없음 | F∧M 통과 | 그 달 통과분 대비 |
+|---|---|---|---|---|
+| 2026-07 (7/29 회의) | 411 | 48 | **5** | 5 / 841 = **0.6%** |
+| 2026-08 (회의 없음) | 327 | 48 | **2** | 2 / 427 = **0.5%** |
+
+두 달 모두 `found` 가 10,000 상한 아래라 잘리지 않았습니다.
+
+### 어디에 몰리나
+
+FOMC 회의 전후에 몰립니다 — 7월 5건 중 3건이 7/28~7/31 입니다. 다만 그
+구간도 통과분이 194건이라 비중은 1.5% 입니다.
+
+비중이 커 보이는 날은 전부 **얇은 날**입니다. 7/06(11건 중 1), 8/03(9건 중 1),
+8/19(10건 중 1) 이 8~10% 인데 분모가 작아서 그렇습니다. 그리고 이 날들은
+이미 신뢰도 게이트(15건) 미달이라 한 건 늘어도 게이트를 넘지 못합니다.
+
+### 놓친 기사의 성격
+
+절반 남짓은 실제 정책 기사입니다.
+
+```
+놓치면 아까운 것 · July FOMC Meeting: A Cautious Hold With Credibility Implications
+                · Treasury yields edge lower as investors look ahead to FOMC minutes
+있어도 그만인 것 · Peso touches P61.995:$1   (FOMC 를 스치듯 언급하는 환율 기사)
+```
+
+### 판단
+
+**재수집(4시간)할 규모가 아닙니다.** 0.5% 이고 게이트 문제도 못 풉니다.
+
+앞으로의 수집에만 `FOMC` 를 질의어에 넣는 것은 비용이 0 이지만 권하지
+않습니다 — 그 시점부터 라이브의 회수 범위가 백필보다 넓어져 **모집단 이음매가
+새로 생깁니다.** 0.5% 를 얻으려고 `docs/scope_impact.md` 에서 다룬 것과 같은
+종류의 불일치를 만드는 셈입니다. 질의어를 바꾼다면 백필도 함께 다시 받아
+양쪽을 맞추는 편이 맞고, 그때는 4시간을 쓸 이유가 따로 있어야 합니다.
+
+재현:
+
+```bash
+python scripts/probe_fomc_query.py --from 2026-07-01 --to 2026-08-01 \
+  --corpus data/news/fed_news_backfill.csv data/news/rejected_backfill.csv \
+           data/news/fed_news.csv data/news/rejected_news.csv
+```
+
+라이브 코퍼스(`fed_news.csv`)는 deploy 브랜치에만 있습니다. main 에서 돌리면
+`git show origin/deploy/streamlit-dashboard:data/news/fed_news.csv` 로 꺼내
+넘겨야 대조가 완전해집니다. 결과는 `outputs/fomc_query_gap*.csv` 입니다.
+
+---
+
 관련 문서: `docs/scope_impact.md` (선정 범위 불일치) ·
 `docs/filter_audit.md` (필터 감사) · `docs/news_fed_index.md` (뉴스축 정의)
