@@ -69,7 +69,11 @@ def export_alerts(con):
 #   라이브 CSV 에도 07-03~07-09 가 있지만 수집 초기의 부실한 표본이다(하루 2~11건).
 #   같은 구간을 Standard 티어로 다시 전수 회수해 141건을 확보했으므로 백필 쪽을 쓴다.
 #   두 원본에 URL 이 겹치는 기사가 12건 있는데, 이 경계로 자르면 자연히 한 번만 센다.
-NEWS_LIVE_FROM = "2026-07-10"
+#
+# 정의는 analysis/news_index_live.py 에 있다 (2026-09-11). 여기 따로 두었더니
+# 통합지수(analysis/daily_index.py)는 이 경계를 모른 채 07-03~07-09 를 넣고
+# 있었다 — 같은 데이터인데 뉴스 페이지와 통합지수가 다른 모집단을 썼다.
+from analysis.news_index_live import NEWS_LIVE_FROM  # noqa: E402
 
 
 def _news_row(r, period):
