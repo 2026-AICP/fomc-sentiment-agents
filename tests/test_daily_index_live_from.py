@@ -88,8 +88,11 @@ def _row(d):
 
 def test_backfill_and_live_never_overlap(monkeypatch):
     ed = pytest.importorskip("analysis.export_dashboard")
-    if not hasattr(ed, "export_news_daily"):
-        pytest.skip("이 브랜치의 export_dashboard 에는 백필 이어붙이기가 없다")
+    # main 쪽 export_news_daily 는 라이브만 내보내는 다른 갈래다. 함수 이름은
+    # 같으므로 hasattr 로는 못 가른다 — 백필을 실제로 읽는지로 판정한다.
+    import inspect
+    if "backfill" not in inspect.getsource(ed.export_news_daily):
+        pytest.skip("이 브랜치의 export_news_daily 는 백필을 이어붙이지 않는다")
 
     # 백필이 경계 너머까지 덮는 상황을 만든다 (실제로 일어났던 상태)
     weekly = ["2026-06-29", "2026-07-06", "2026-07-13", "2026-08-31"]
