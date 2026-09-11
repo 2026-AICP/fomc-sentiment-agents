@@ -52,7 +52,7 @@ News↔Fed 상관 **+0.19** (약함) → 서로 다른 정보를 담은 거의 �
 |---|---|---|---|
 | 시장 영향(문헌) | 큼 | statement 이상 | 작고 감소 추세 |
 | 적시성 | 즉시 | 30분 후 라이브 | **3주 지연** |
-| 정보 고유성 | 공식 스탠스 | 실시간 뉘앙스 (성명문보다 일관되게 신중 — `presser_analysis.md`, gap -0.113, p<10⁻¹²) | 위원회 내부 이견·세부 논거 |
+| 정보 고유성 | 공식 스탠스 | 실시간 뉘앙스 (성명문보다 일관되게 신중 — `presser_analysis.md`, gap -0.130, 부호검정 p<10⁻⁵) | 위원회 내부 이견·세부 논거 |
 | 커버리지 | 2000~ 전체 | **2011-04~**, 2019 전엔 SEP 회의만 | 전체 |
 
 문헌: [SF Fed USMPD(2025)](https://www.frbsf.org/research-and-insights/publications/working-papers/2025/12/financial-market-effects-of-fomc-communication-evidence-from-a-new-event-study-database/)
