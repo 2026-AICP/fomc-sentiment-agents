@@ -15,10 +15,20 @@
   다시 돌리지 않기 위해서다. 백필 일별은 중앙값 7건이라 신뢰도 하한(15건)을
   73% 의 날이 못 넘는다 — 어떤 단위로 낼지는 별도 결정 사항이다.
 
+★수집분은 **상위집합**이고, 키워드 판정은 집계 직전에 건다 (2026-09-11).
+  fed_news_backfill.csv 는 수집 당시 규칙으로 통과한 53,403건이다. 이후 키워드가
+  좁아졌으므로(조교 추천분 제거 → BBD+HRS) 그대로 집계하면 확정 규칙보다 넓은
+  모집단이 나온다. 원본을 잘라내는 대신 여기서 relevant_of 를 걸어 맞춘다.
+  ─ 원본을 자르면 키워드가 다시 넓어질 때 재수집(4시간)이 필요해진다. 남겨두면
+    재필터로 끝난다. 탈락분도 rejected_backfill.csv 에 그대로 있다.
+  ─ 캐시는 원본과 행 순서가 1:1 이라 재채점 없이 부분집합을 고를 수 있다.
+    그 전제는 _aligned_text 가 매번 검증한다.
+
 실행:
-  python3 analysis/news_index_backfill.py            # 일별
-  python3 analysis/news_index_backfill.py --weekly   # 주별
-  python3 analysis/news_index_backfill.py --monthly  # 월별
+  python3 analysis/news_index_backfill.py             # 일별
+  python3 analysis/news_index_backfill.py --weekly    # 주별
+  python3 analysis/news_index_backfill.py --monthly   # 월별
+  python3 analysis/news_index_backfill.py --no-filter # 수집 당시 규칙 그대로(비교용)
 """
 import sys
 from pathlib import Path
@@ -49,6 +59,38 @@ def scored(csv_path=IN, cache=CACHE):
     art.to_csv(cache, index=False)
     print(f"채점 캐시 저장 → {cache.name}")
     return art
+
+
+def _aligned_text(art, csv_path=IN):
+    """채점 캐시에 원본 판정용 텍스트 컬럼을 붙인다 — 행 순서 1:1 전제를 검증하면서.
+
+    로더가 한 행이라도 드롭하면 인덱스 대응이 어긋나 엉뚱한 기사를 거르게 된다.
+    조용히 틀리면 지수가 통째로 오염되므로 여기서 멈춘다.
+    """
+    import pandas as pd
+    raw = pd.read_csv(csv_path, encoding="utf-8-sig")
+    if len(raw) != len(art):
+        raise SystemExit(
+            f"행 수 불일치 — 캐시 {len(art):,} · 원본 {len(raw):,}\n"
+            f"  채점 캐시를 지우고 다시 돌려야 한다: {CACHE}")
+    same = (pd.to_datetime(art["dt"]).dt.date.values
+            == pd.to_datetime(raw["date"], errors="coerce").dt.date.values).mean()
+    if same < 0.999:
+        raise SystemExit(f"행 정렬 검증 실패 — 날짜 일치율 {same:.3%}")
+    out = art.copy()
+    for c in ("title", "description", "snippet", "keywords"):
+        out[c] = raw[c].fillna("").values if c in raw.columns else ""
+    return out
+
+
+def apply_current_rule(art, csv_path=IN):
+    """수집분(상위집합)에 **현재** 키워드 규칙을 적용한다."""
+    from engine.news_scrape import relevant_of
+    a = _aligned_text(art, csv_path)
+    keep = a.apply(relevant_of, axis=1)
+    print(f"현재 키워드 규칙 적용: {len(a):,} → {int(keep.sum()):,}건 "
+          f"({keep.mean():.1%})")
+    return a[keep].drop(columns=["title", "description", "snippet", "keywords"])
 
 
 def aggregate_period(art, freq):
@@ -82,6 +124,8 @@ def aggregate_period(art, freq):
 def main():
     argv = sys.argv[1:]
     art = scored()
+    if "--no-filter" not in argv:          # 수집 당시 규칙 그대로 보고 싶을 때만 끈다
+        art = apply_current_rule(art)
     if "--weekly" in argv:
         out, idx = ROOT / "outputs" / "news_index_backfill_weekly.csv", aggregate_period(art, "W")
         unit = "주"
