@@ -101,7 +101,13 @@ def export_news_daily():
         # _csv_rows 는 없는 파일에 []를 돌려주므로 그냥 두면 5.5년치가 조용히 사라지고
         # 사이트가 최근 두 달만 보여준다. 러너 로그에 남겨 알아챌 수 있게 한다.
         print(f"  warn: 백필 지수가 없습니다({bf_csv.name}) — 뉴스축이 라이브 구간만 나갑니다.")
-    bf = [_news_row(r, "weekly") for r in _csv_rows(bf_csv)]
+    # 양쪽 다 경계로 자른다. 라이브만 자르고 백필을 그대로 두면, 백필 CSV 가
+    # 경계 너머까지 덮는 순간 같은 기간이 주별·일별로 두 번 그려진다.
+    #   2026-09-11 에 실제로 그랬다 — 재수집한 백필이 09-10 까지 덮어 9주가
+    #   겹쳤다. 그전 CSV 가 마침 07-06 에서 끝나 드러나지 않았을 뿐, 코드가
+    #   CSV 의 끝 날짜에 기대고 있었다.
+    bf = [_news_row(r, "weekly") for r in _csv_rows(bf_csv)
+          if r["date"] < NEWS_LIVE_FROM]
     live = [_news_row(r, "daily")
             for r in _csv_rows(ROOT / "outputs" / "news_index_live.csv")
             if r["date"] >= NEWS_LIVE_FROM]

@@ -74,3 +74,39 @@ def test_constant_matches_dashboard_export():
     else:
         # 정의 없이 import 해 쓰는 형태면 그것이 바람직한 상태다
         assert "news_index_live import" in src or "NEWS_LIVE_FROM" in src
+
+
+# ── 표시부: 백필(주별)과 라이브(일별)가 겹치지 않는지 ────────────────────────
+# 2026-09-11 회귀: 재수집한 백필이 09-10 까지 덮자 9주가 라이브 구간과 겹쳐
+# 같은 기간이 주별·일별로 두 번 그려졌다. 그전 CSV 가 마침 07-06 에서 끝나
+# 드러나지 않았을 뿐, export 가 CSV 의 끝 날짜에 기대고 있었다.
+
+def _row(d):
+    return {"date": d, "n_articles": "20", "conf_weighted": "0.1",
+            "ci_lo": "-0.1", "ci_hi": "0.3", "confidence": "0.6"}
+
+
+def test_backfill_and_live_never_overlap(monkeypatch):
+    ed = pytest.importorskip("analysis.export_dashboard")
+    if not hasattr(ed, "export_news_daily"):
+        pytest.skip("이 브랜치의 export_dashboard 에는 백필 이어붙이기가 없다")
+
+    # 백필이 경계 너머까지 덮는 상황을 만든다 (실제로 일어났던 상태)
+    weekly = ["2026-06-29", "2026-07-06", "2026-07-13", "2026-08-31"]
+    daily = ["2026-07-09", "2026-07-10", "2026-09-10"]
+
+    def fake_rows(path):
+        name = str(path)
+        return [_row(d) for d in (weekly if "backfill" in name else daily)]
+
+    monkeypatch.setattr(ed, "_csv_rows", fake_rows)
+    out = ed.export_news_daily()
+
+    w = [r["date"] for r in out if r["period"] == "weekly"]
+    d = [r["date"] for r in out if r["period"] == "daily"]
+    assert max(w) < min(d), f"주별({max(w)})이 일별({min(d)}) 구간을 침범했다"
+    assert w == ["2026-06-29", "2026-07-06"]     # 경계 이후 주는 빠진다
+    assert d == ["2026-07-10", "2026-09-10"]     # 경계 이전 날은 빠진다
+
+    dates = [r["date"] for r in out]
+    assert len(dates) == len(set(dates)), "같은 날짜가 두 번 나간다"
