@@ -4,8 +4,10 @@
     "std": 0.2532
   },
   "news": {
-    "mean": 0.0167,
-    "std": 0.0924
+    "mean": 0.0822,
+    "std": 0.166,
+    "source": "news_index_backfill_weekly.csv (298주, 백필 주별)",
+    "note": "라이브 일별 std 대비 -17% (2026-07-10~ 기준) — docs/headline_norm_issue.md §7·§8"
   },
   "w_fed": 0.5,
   "w_news": 0.5,
@@ -14,7 +16,8 @@
     "n_months": 256,
     "r_fed": -0.423,
     "r_news": -0.385,
-    "r_combined": -0.524
+    "r_combined": -0.524,
+    "note": "WSJ 백본 월별로 계산한 방법 검증이다. news 의 mean/std 출처(백필 주별)와는 모집단이 다르다 — 상관계수는 아핀변환에 불변이라 r 값은 영향받지 않는다."
   },
   "presser": {
     "mean": 0.0556,
