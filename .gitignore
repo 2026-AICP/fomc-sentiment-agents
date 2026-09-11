@@ -32,3 +32,5 @@ outputs/
 dashboard-web/node_modules/
 dashboard-web/dist/
 dashboard-web/public/data/
+
+node_modules/
