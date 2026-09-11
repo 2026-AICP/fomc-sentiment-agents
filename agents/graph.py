@@ -424,7 +424,7 @@ def notifier_node(state: State) -> State:
         return state
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    sent = nt.read_log()
+    sent = nt.read_sent()
     d = nt.decide(state["date"], sig.get("grade", "—"), sig.get("fired") or [],
                   sig.get("n_articles"), sig.get("ci_lo"), sig.get("ci_hi"),
                   today=today, sent=sent, details=sig.get("details"),
