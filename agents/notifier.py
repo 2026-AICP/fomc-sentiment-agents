@@ -1,8 +1,8 @@
 """Notifier — 발송 판정과 본문 생성 (docs/notification_design.md §2·§4·§5·§7-1).
 
-**드라이런이다.** 실제 발송은 하지 않는다 — 이 파일은 smtplib 도 resend 도 import
-하지 않으므로 호출할 발송 함수 자체가 없다. 남기는 것은 outputs/notification_log.csv
-한 행뿐이고, 인프라(§10-2~4)가 붙은 뒤에 send() 를 얹는다.
+**판정만 한다.** 이 파일은 smtplib·resend·requests 를 import 하지 않는다. 실제 발송은
+agents/mailer.py 가 맡고, 저장소 변수 ALERT_SEND 가 "1" 일 때만 나간다
+(docs/superpowers/specs/2026-09-13-alert-delivery-design.md). 그 외에는 드라이런이다.
 
 판정(decide·decide_correction)과 렌더(render)는 **순수 함수**다. 네트워크·DB·파일에
 의존하지 않으므로 단위테스트가 결정적이다. 파일을 만지는 것은 append_log·read_sent 뿐.
@@ -30,7 +30,7 @@ NOTIFICATION_LOG = ROOT / "outputs" / "notification_log.csv"
 LOG_FIELDS = ["date", "kind", "grade", "fired", "channel",
               "n_recipients", "n_failed", "suppressed_reason"]
 
-# 발송 채널. 인프라 이전이라 지금 쓰이는 값은 dryrun 뿐이다(§1 의 email/push 확장 예정).
+# 발송 채널. ALERT_SEND 가 꺼져 있으면 dryrun, 켜져 있으면 email (push 는 §1 확장 예정).
 CHANNEL_DRYRUN = "dryrun"
 CHANNEL_EMAIL = "email"      # ALERT_SEND=1 로 실제 발송했을 때 (agents/mailer.py)
 
