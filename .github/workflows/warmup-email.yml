@@ -15,8 +15,9 @@ on:
   workflow_dispatch:
     inputs:
       to:
-        description: '받는 주소 (쉼표로 여러 명, 한 명씩 따로 발송)'
+        description: '받는 주소 (쉼표로 여러 명, 한 명씩 따로 발송). team 이라고 쓰면 ALERT_RECIPIENTS 명단'
         required: true
+        default: 'team'
       from:
         description: '보내는 주소'
         required: true
@@ -41,18 +42,24 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           # 입력값은 env 로 넘긴다. 스크립트 안에 ${{ }} 를 직접 쓰면 받는 주소에
           # 셸 메타문자를 넣어 명령을 주입할 수 있다.
+          # ★실행 로그 맨 위에 env 값이 그대로 찍히고, 공개 저장소라 로그도 공개다.
+          #  주소를 직접 입력하면 로그에 노출되므로 팀 전체에는 to=team 을 쓴다 —
+          #  Secret 은 로그에서 *** 로 가려진다. 직접 입력했다면 실행 뒤 run 을 삭제할 것.
           MAIL_TO: ${{ inputs.to }}
+          TEAM_TO: ${{ secrets.ALERT_RECIPIENTS }}
           MAIL_FROM: ${{ inputs.from }}
           MAIL_SUBJECT: ${{ inputs.subject }}
           MAIL_BODY: ${{ inputs.body }}
         run: |
           set -euo pipefail
 
+          [ "$MAIL_TO" = "team" ] && MAIL_TO="$TEAM_TO"
           now="$(date -u '+%Y-%m-%d %H:%M UTC')"
           failed=0
           n=0
           # 주소는 로그에 찍지 않는다 — 리포가 PUBLIC 이고 실행 로그도 공개다.
-          while IFS= read -r to; do
+          # 마지막 주소 뒤에 줄바꿈이 없어도 읽도록 || [ -n "$to" ] (2026-09-13 마지막 1명 누락)
+          while IFS= read -r to || [ -n "$to" ]; do
             [ -n "$to" ] || continue
             n=$((n + 1))
             if [ -n "$MAIL_SUBJECT" ] && [ -n "$MAIL_BODY" ]; then
