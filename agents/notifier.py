@@ -43,6 +43,7 @@ SUP_BELOW_LEVEL = "level_below_alert"    # §2-1 기본값 🔴, ⚠️ 는 구�
 SUP_ALREADY_SENT = "already_sent"        # 같은 날짜·종류 재발송 금지
 SUP_UNCHANGED = "grade_unchanged"        # §2-3 등급이 그대로인 확정판 전환
 SUP_MERGED = "merged_same_day"           # §2-2 같은 날 같은 회의의 다른 메일에 합쳐짐
+SUP_SEND_FAILED = "send_failed"          # 발송 시도했으나 한 명도 못 받음 — 다음 실행에서 재판정
 
 LEVEL_ALERT = "alert"        # 🔴 만
 LEVEL_CAUTION = "caution"    # ⚠️ 이상
@@ -261,6 +262,10 @@ def read_sent(path=None) -> set:
 
     채널로는 거르지 않는다. 드라이런에서도 "보냈을 날"은 중복 기록을 막아야
     발송을 켠 뒤와 같은 규칙으로 돈다.
+
+    send_failed(한 명도 못 받은 발송)도 사유가 있는 행이라 세지 않는다 — 받은 사람이
+    없으니 다시 보내도 두 통이 가지 않는다(설계 §5-4). 일부만 실패한 행은 사유가
+    비어 있어 '보냄'으로 센다.
     """
     p = Path(path or NOTIFICATION_LOG)
     if not p.exists():

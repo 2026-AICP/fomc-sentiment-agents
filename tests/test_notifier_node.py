@@ -171,6 +171,7 @@ def test_sent_decision_logs_email_channel_and_counts(tmp_path, monkeypatch):
     assert row["channel"] == "email"
     assert row["n_recipients"] == "3" and row["n_failed"] == "1"
     assert any("[mailer] 발송 실패 1/3" in line for line in out["log"])
+    assert row["suppressed_reason"] == ""            # 일부 실패는 '보냄' — 재시도 없음
 
 
 def test_delivery_exception_does_not_crash_node(tmp_path, monkeypatch):
@@ -182,6 +183,7 @@ def test_delivery_exception_does_not_crash_node(tmp_path, monkeypatch):
     out = graph.notifier_node(_state("2026-08-20", GRADE_ALERT, ["divergence"]))
     assert _rows(p)[0]["channel"] == "email"
     assert any("발송 단계 예외" in line for line in out["log"])
+    assert _rows(p)[0]["suppressed_reason"] == nt.SUP_SEND_FAILED
 
 
 def test_suppressed_decision_is_not_delivered(tmp_path, monkeypatch):
@@ -191,3 +193,32 @@ def test_suppressed_decision_is_not_delivered(tmp_path, monkeypatch):
         raise AssertionError("억제된 결정을 보내면 안 된다")
     monkeypatch.setattr(mailer, "deliver", must_not_call)
     graph.notifier_node(_state("2026-08-20", GRADE_ALIGNED, []))
+
+
+def test_total_failure_is_send_failed_and_retried_on_rerun(tmp_path, monkeypatch):
+    """전원 실패면 send_failed — 같은 날 재실행에서 다시 보낸다(설계 §5-4)."""
+    p = _today(monkeypatch, tmp_path, "2026-08-20")
+    calls = []
+
+    def all_fail(d):
+        calls.append(d.kind)
+        return ("email", 2, 2, ["발송 실패 2/2"])
+    monkeypatch.setattr(mailer, "deliver", all_fail)
+    st = _state("2026-08-20", GRADE_ALERT, ["divergence"])
+    out = graph.notifier_node(st)
+    row = _rows(p)[0]
+    assert row["suppressed_reason"] == nt.SUP_SEND_FAILED
+    assert row["channel"] == "email" and row["n_failed"] == "2"
+    assert any("받은 사람 없음" in line for line in out["log"])
+    assert nt.read_sent() == set()
+    graph.notifier_node(dict(st, log=[]))
+    assert calls == ["signal", "signal"]
+
+
+def test_zero_recipients_is_send_failed(tmp_path, monkeypatch):
+    """명단이 비어 0명에게 '보낸' 것은 보낸 것이 아니다."""
+    p = _today(monkeypatch, tmp_path, "2026-08-20")
+    monkeypatch.setattr(mailer, "deliver",
+                        lambda d: ("email", 0, 0, ["구독자 조회 실패: HTTP 500"]))
+    graph.notifier_node(_state("2026-08-20", GRADE_ALERT, ["divergence"]))
+    assert _rows(p)[0]["suppressed_reason"] == nt.SUP_SEND_FAILED

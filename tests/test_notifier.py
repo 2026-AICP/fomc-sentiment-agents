@@ -18,6 +18,7 @@ from agents.notifier import (
     SUP_NOT_ACTIONABLE,
     SUP_NOT_TODAY,
     SUP_MERGED,
+    SUP_SEND_FAILED,
     SUP_UNCHANGED,
     append_log,
     confidence_label,
@@ -274,3 +275,13 @@ def test_log_records_channel_and_counts(tmp_path):
     row = list(csv.DictReader(open(p, encoding="utf-8")))[0]
     assert row["channel"] == "email"
     assert row["n_recipients"] == "5" and row["n_failed"] == "1"
+
+
+def test_read_sent_skips_send_failed(tmp_path):
+    """한 명도 못 받은 알림은 '보냄'이 아니다 — 다음 실행에서 다시 판정된다(설계 §5-4)."""
+    p = tmp_path / "notification_log.csv"
+    d = decide(TODAY, GRADE_ALERT, ["divergence"], **OK)
+    d.suppressed = SUP_SEND_FAILED
+    append_log(d, path=p, channel=CHANNEL_EMAIL, n_recipients=2, n_failed=2)
+    assert SUP_SEND_FAILED == "send_failed"
+    assert read_sent(p) == set()
