@@ -1,25 +1,34 @@
 name: Warm-up email
 
-# 발신 평판 예열용 수동 발송. **구독자 알림이 아니다** — 팀 내부 주소로만 보낸다.
+# 팀 내부 주소로 보내는 수동 발송. **구독자 알림이 아니다.**
 #
-# 새로 산 도메인은 전송 이력이 없어서, 어느 날 갑자기 여러 명에게 보내면 받는 쪽
-# 메일 서버가 스팸으로 분류한다. 며칠에 걸쳐 소량씩 보내 "정상적으로 쓰이는
-# 도메인"이라는 기록을 만들어 둔다.
-#   1일차 본인 1통 → 2~3일차 팀원 4명 → 이후 며칠 소량
+# 처음에는 발신 평판 예열용이었다. 새로 산 도메인은 전송 이력이 없어서, 어느 날 갑자기
+# 여러 명에게 보내면 받는 쪽 메일 서버가 스팸으로 분류한다. 며칠에 걸쳐 소량씩 보내
+# "정상적으로 쓰이는 도메인"이라는 기록을 만들어 둔다.
 #
-# agents/notifier.py 는 건드리지 않는다. 그쪽은 여전히 드라이런이고,
-# tests/test_notifier_node.py 의 "발송 모듈 import 금지" 잠금도 그대로다.
-# 실제 알림 발송은 θ 재보정(B-1)까지 끝난 뒤에 켠다.
+# 2026-09-13 부터 팀 안내 메일(수신 안내 등)도 이걸로 보낸다. 제목·본문을 입력으로
+# 받고, 비워 두면 예전의 "발신 점검" 메일이다. 실제 알림은 daily-news.yml →
+# agents/mailer.py 가 보낸다.
+#
+# 받는 사람마다 한 통씩 보낸다 — 받는 칸에 여러 명을 넣으면 서로 주소가 보인다.
 on:
   workflow_dispatch:
     inputs:
       to:
-        description: '받는 주소 (쉼표로 여러 명)'
+        description: '받는 주소 (쉼표로 여러 명, 한 명씩 따로 발송)'
         required: true
       from:
         description: '보내는 주소'
         required: true
-        default: 'noreply@econpilot.org'
+        default: 'EconPilot <noreply@econpilot.org>'
+      subject:
+        description: '제목 (비우면 발신 점검 메일)'
+        required: false
+        default: ''
+      body:
+        description: '본문 평문 (비우면 발신 점검 메일)'
+        required: false
+        default: ''
 
 permissions: {}                   # 저장소를 읽거나 쓰지 않는다
 
@@ -34,30 +43,48 @@ jobs:
           # 셸 메타문자를 넣어 명령을 주입할 수 있다.
           MAIL_TO: ${{ inputs.to }}
           MAIL_FROM: ${{ inputs.from }}
+          MAIL_SUBJECT: ${{ inputs.subject }}
+          MAIL_BODY: ${{ inputs.body }}
         run: |
           set -euo pipefail
 
-          jq -n --arg from "$MAIL_FROM" --arg to "$MAIL_TO" \
-                --arg now "$(date -u '+%Y-%m-%d %H:%M UTC')" '
-            {
-              from: $from,
-              to: ($to | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))),
-              subject: "EconPilot 발신 점검",
-              html: ("<p>EconPilot 메일 발신 경로 점검입니다.</p>"
-                     + "<p>보낸 시각: " + $now + "</p>"
-                     + "<p>이 메일이 스팸함으로 갔다면 [스팸 아님]으로 표시해 주세요.</p>")
-            }' > payload.json
+          now="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          failed=0
+          n=0
+          # 주소는 로그에 찍지 않는다 — 리포가 PUBLIC 이고 실행 로그도 공개다.
+          while IFS= read -r to; do
+            [ -n "$to" ] || continue
+            n=$((n + 1))
+            if [ -n "$MAIL_SUBJECT" ] && [ -n "$MAIL_BODY" ]; then
+              jq -n --arg from "$MAIL_FROM" --arg to "$to" \
+                    --arg subject "$MAIL_SUBJECT" --arg text "$MAIL_BODY" \
+                '{from: $from, to: [$to], subject: $subject, text: $text}' > payload.json
+            else
+              jq -n --arg from "$MAIL_FROM" --arg to "$to" --arg now "$now" '
+                {
+                  from: $from,
+                  to: [$to],
+                  subject: "EconPilot 발신 점검",
+                  html: ("<p>EconPilot 메일 발신 경로 점검입니다.</p>"
+                         + "<p>보낸 시각: " + $now + "</p>"
+                         + "<p>이 메일이 스팸함으로 갔다면 [스팸 아님]으로 표시해 주세요.</p>")
+                }' > payload.json
+            fi
 
-          code=$(curl -sS -o resp.json -w '%{http_code}' \
-            -X POST https://api.resend.com/emails \
-            -H "Authorization: Bearer $RESEND_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d @payload.json)
+            code=$(curl -sS -o resp.json -w '%{http_code}' \
+              -X POST https://api.resend.com/emails \
+              -H "Authorization: Bearer $RESEND_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d @payload.json) || code=000
 
-          if [ "$code" -ge 300 ]; then
-            echo "발송 실패 (HTTP $code)"
-            cat resp.json
-            exit 1
-          fi
+            if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
+              echo "$n번째 발송 성공 — id: $(jq -r '.id' resp.json)"
+            else
+              echo "$n번째 발송 실패 (HTTP $code) — $(jq -r '.message // .name // empty' resp.json 2>/dev/null)"
+              failed=$((failed + 1))
+            fi
+            sleep 1                 # Resend 초당 요청 제한
+          done < <(printf '%s' "$MAIL_TO" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
 
-          echo "발송 성공 — id: $(jq -r '.id' resp.json)"
+          echo "발송 ${n}건 · 실패 ${failed}건"
+          [ "$n" -gt 0 ] && [ "$failed" -eq 0 ]
