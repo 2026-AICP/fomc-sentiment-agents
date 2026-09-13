@@ -32,6 +32,7 @@ LOG_FIELDS = ["date", "kind", "grade", "fired", "channel",
 
 # 발송 채널. 인프라 이전이라 지금 쓰이는 값은 dryrun 뿐이다(§1 의 email/push 확장 예정).
 CHANNEL_DRYRUN = "dryrun"
+CHANNEL_EMAIL = "email"      # ALERT_SEND=1 로 실제 발송했을 때 (agents/mailer.py)
 
 # 억제 사유 — 고정 코드. 새 사유가 필요하면 여기 상수를 늘린다(자유 문자열 금지).
 SUP_NOT_TODAY = "not_today"              # §4 소급 발송 금지
@@ -198,7 +199,7 @@ def strip_measurements(s: str) -> str:
     return _NUMERIC_PAREN.sub("", s)
 
 
-def render(d: Decision) -> tuple:
+def render(d: Decision, footer: Optional[str] = None) -> tuple:
     """(제목, 본문). §5 규격 — 숫자는 넣지 않는다.
 
     지수·CI 폭·기사 수는 사이트의 '상세보기'에만 있다. 이메일만 상세해지면 그 구분이
@@ -243,8 +244,10 @@ def render(d: Decision) -> tuple:
         subject = subject.replace("[정정]", "[FOMC 회의록 · 정정]", 1)
         lines.insert(0, f"{d.date} FOMC 회의록이 공개되었습니다.")
 
+    # 실제 발송 시 mailer 가 수신자별 푸터(해지 링크 또는 팀 고정 안내)를 넘긴다.
+    # 인자가 없으면 드라이런 푸터 그대로다.
     lines += ["", DISCLAIMER, f"자세히 보기: {SIGNALS_URL}",
-              "수신거부: (구독 기능 준비 중 — 드라이런)"]
+              footer if footer is not None else "수신거부: (구독 기능 준비 중 — 드라이런)"]
     return subject, "\n".join(lines)
 
 
@@ -267,7 +270,8 @@ def read_sent(path=None) -> set:
                 if not r["suppressed_reason"]}
 
 
-def append_log(d: Decision, path=None, channel=CHANNEL_DRYRUN) -> None:
+def append_log(d: Decision, path=None, channel=CHANNEL_DRYRUN,
+               n_recipients=None, n_failed=None) -> None:
     """§7-1 발송 로그 1행 append. 억제된 날도 남긴다 — 사유가 있어야 빈도가 읽힌다.
 
     덮어쓰지 않는다(질문 6 원칙의 연장). 개인 식별 정보는 어떤 컬럼에도 없다.
@@ -275,6 +279,9 @@ def append_log(d: Decision, path=None, channel=CHANNEL_DRYRUN) -> None:
     **하루 1행은 정상 운영 시의 관찰이지 불변식이 아니다.** 억제된 날을 같은 날
     재실행하면 행이 하나 더 쌓인다(read_sent 참조) — 두 번 시도한 사실이 남는
     것이므로 맞는 동작이다. 발송 빈도를 셀 때는 (date, kind) 로 중복을 제거할 것.
+
+    n_recipients · n_failed 는 실제 발송 결과(agents/mailer.py)다. 넘기지 않으면
+    드라이런 값 — send 면 0, 억제면 빈칸 — 을 쓴다.
     """
     p = Path(path or NOTIFICATION_LOG)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -283,8 +290,12 @@ def append_log(d: Decision, path=None, channel=CHANNEL_DRYRUN) -> None:
         w = csv.DictWriter(f, fieldnames=LOG_FIELDS)
         if new:
             w.writeheader()
+        if n_recipients is None:
+            n_recipients = 0 if d.send else ""
+        if n_failed is None:
+            n_failed = 0 if d.send else ""
         w.writerow({"date": d.date, "kind": d.kind, "grade": d.grade,
                     "fired": ";".join(d.fired), "channel": channel,
-                    "n_recipients": 0 if d.send else "",   # 드라이런이라 항상 0
-                    "n_failed": 0 if d.send else "",
+                    "n_recipients": n_recipients,
+                    "n_failed": n_failed,
                     "suppressed_reason": d.suppressed or ""})

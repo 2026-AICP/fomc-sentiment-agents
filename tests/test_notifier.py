@@ -10,6 +10,7 @@ from agents.notifier import (
     LOG_FIELDS,
     LEVEL_ALERT,
     LEVEL_CAUTION,
+    CHANNEL_EMAIL,
     SUP_ALREADY_SENT,
     SUP_BELOW_LEVEL,
     SUP_NO_ARTICLES,
@@ -252,3 +253,24 @@ def test_read_sent_blocks_real_duplicate(tmp_path):
 
     d = decide(TODAY, GRADE_ALERT, ["divergence"], sent=read_sent(p), **OK)
     assert not d.send and d.suppressed == SUP_ALREADY_SENT
+
+
+# --- 실제 발송 연결 (알림 발송 설계 §5-2 · §7) ---------------------------------
+def test_render_uses_given_footer_instead_of_dryrun_line():
+    d = decide(TODAY, GRADE_ALERT, ["divergence"], **OK)
+    _, body = render(d, footer="수신거부: https://econpilot.org/api/unsubscribe?t=abc")
+    assert "https://econpilot.org/api/unsubscribe?t=abc" in body
+    assert "드라이런" not in body
+
+def test_render_default_footer_unchanged():
+    d = decide(TODAY, GRADE_ALERT, ["divergence"], **OK)
+    _, body = render(d)
+    assert "수신거부: (구독 기능 준비 중 — 드라이런)" in body
+
+def test_log_records_channel_and_counts(tmp_path):
+    p = tmp_path / "notification_log.csv"
+    append_log(decide(TODAY, GRADE_ALERT, ["divergence"], **OK), path=p,
+               channel=CHANNEL_EMAIL, n_recipients=5, n_failed=1)
+    row = list(csv.DictReader(open(p, encoding="utf-8")))[0]
+    assert row["channel"] == "email"
+    assert row["n_recipients"] == "5" and row["n_failed"] == "1"
