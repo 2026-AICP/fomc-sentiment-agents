@@ -9,6 +9,7 @@ notifier.py 가 발송 모듈을 import 하지 않는다는 잠금(tests/test_no
 ★받는 사람 주소를 로그·notes·예외 메시지 어디에도 넣지 않는다. notes 는 파이프라인
   로그로 흘러가고, 그 로그는 PUBLIC 리포에 커밋될 수 있다.
 """
+import hashlib
 import os
 import time
 
@@ -106,6 +107,17 @@ def _payload(recipient, decision):
     return payload
 
 
+def _idempotency_key(recipient, decision):
+    """Resend 중복 방지 키 (설계 §5-5). 같은 알림 종류·날짜·사람이면 같은 키.
+
+    해시라 주소가 드러나지 않는다. Resend 는 24시간 동안 키를 기억하므로 같은 날
+    재실행의 중복만 막는다 — 로그 push 실패로 다음 날 다시 판정되는 경우의 주 방어선은
+    daily-news.yml 의 push 재시도다.
+    """
+    raw = "|".join([decision.kind, decision.date, recipient["email"]])
+    return "econpilot-" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:40]
+
+
 def deliver(decision, env=None, get=requests.get, post=requests.post, sleep=time.sleep):
     """decision 을 받는 사람마다 한 통씩 보낸다.
 
@@ -135,7 +147,9 @@ def deliver(decision, env=None, get=requests.get, post=requests.post, sleep=time
             sleep(SEND_GAP_SEC)
         try:
             r = post(RESEND_URL, json=_payload(rcp, decision),
-                     headers={"Authorization": f"Bearer {key}"}, timeout=TIMEOUT)
+                     headers={"Authorization": f"Bearer {key}",
+                              "Idempotency-Key": _idempotency_key(rcp, decision)},
+                     timeout=TIMEOUT)
             if not 200 <= r.status_code < 300:
                 failed += 1
         except Exception:
