@@ -41,6 +41,7 @@ SUP_NOT_ACTIONABLE = "grade_not_actionable"   # §4 ⚪ 관망·중립·🟢 정
 SUP_BELOW_LEVEL = "level_below_alert"    # §2-1 기본값 🔴, ⚠️ 는 구독자 옵트다운
 SUP_ALREADY_SENT = "already_sent"        # 같은 날짜·종류 재발송 금지
 SUP_UNCHANGED = "grade_unchanged"        # §2-3 등급이 그대로인 확정판 전환
+SUP_MERGED = "merged_same_day"           # §2-2 같은 날 같은 회의의 다른 메일에 합쳐짐
 
 LEVEL_ALERT = "alert"        # 🔴 만
 LEVEL_CAUTION = "caution"    # ⚠️ 이상
@@ -60,7 +61,7 @@ SIGNALS_URL = "https://aicp-econpilot.github.io/#/signals"
 class Decision:
     """발송 판정 결과. send=False 면 suppressed 에 사유 코드가 담긴다."""
     date: str
-    kind: str                      # signal / correction
+    kind: str                      # signal / correction / fed_meeting / fed_minutes
     grade: str
     fired: list
     send: bool
@@ -69,6 +70,7 @@ class Decision:
     confidence: str = "보통"
     news_only: bool = False        # 회의 사이 구간 — Fed 축 불변(§4)
     prev_grade: Optional[str] = None   # kind=correction 일 때 정정 전 등급
+    fed_event: Optional[str] = None    # 이 메일에 합쳐진 Fed 일정 — "meeting" / "minutes"
 
 
 def confidence_label(n_articles, ci_lo, ci_hi) -> str:
@@ -151,6 +153,47 @@ def decide_correction(date, grade, grade_final, today, sent=()) -> Optional[Deci
 _NUMERIC_PAREN = re.compile(r"\s*\([^)]*\d[^)]*\)")
 
 
+def decide_fed_meeting(date, today, grade="", sent=(), signal_sends=False) -> Decision:
+    """§2-2 FOMC 회의일 알림 — 성명문·기자회견을 한 통으로.
+
+    같은 날 같은 회의에 메일이 두 통 가지 않게 한다(조교 피드백 2026-09-10).
+    그날 🔴 신호 메일이 나가면 일정은 그 메일에 합치고(merged), 신호가 조용하면
+    일정 알림이 따로 1통 나간다. 등급·게이트·휴장은 보지 않는다 — 일정 통보라서다.
+    """
+    d = Decision(date=date, kind="fed_meeting", grade=grade, fired=[], send=False)
+    if date != today:                              # 회의록 재방문 실행 등
+        d.suppressed = SUP_NOT_TODAY
+    elif (date, "fed_meeting") in sent or (date, "signal") in sent:
+        # 신호 메일이 이미 나갔다면 일정은 거기 합쳐져 나간 것이다.
+        d.suppressed = SUP_ALREADY_SENT
+    elif signal_sends:
+        d.suppressed = SUP_MERGED
+    else:
+        d.send = True
+    return d
+
+
+def decide_fed_minutes(date, grade_final, sent=(), correction_sends=False) -> Decision:
+    """§2-2 회의록 공개 알림 — **실제 도착일** 기준.
+
+    예정일로 보내면 "공개"라고 했는데 아직 없는 날이 생긴다(2026-08-03 회의 회의록은
+    3주가 지나도 오지 않았다, §3). 회의록 도착은 곧 확정판이 나오는 날이라 정정
+    알림(§2-3)과 겹칠 수 있다 — 정정이 나가면 그 메일에 합친다.
+
+    date 는 회의일이고 발송은 도착일이므로 not_today 를 걸지 않는다(정정과 같다).
+    과거 회의 재처리에서 울리지 않게 하는 가드는 호출부(graph)가 건다 — 그 회의의
+    속보치 기록이 있을 때만 부른다.
+    """
+    d = Decision(date=date, kind="fed_minutes", grade=grade_final, fired=[], send=False)
+    if (date, "fed_minutes") in sent or (date, "correction") in sent:
+        d.suppressed = SUP_ALREADY_SENT
+    elif correction_sends:
+        d.suppressed = SUP_MERGED
+    else:
+        d.send = True
+    return d
+
+
 def strip_measurements(s: str) -> str:
     return _NUMERIC_PAREN.sub("", s)
 
@@ -162,7 +205,18 @@ def render(d: Decision) -> tuple:
     무너진다(질문 3 피드백). 제목에 등급을 넣는 것은 받은편지함에서 열지 않고도
     판단할 수 있어야 하기 때문이다.
     """
-    if d.kind == "correction":
+    if d.kind == "fed_meeting":
+        subject = f"[FOMC] {d.date} 결과 발표"
+        lines = [f"오늘은 FOMC 결과 발표일입니다 (성명문 · 기자회견).",
+                 f"오늘의 신호: {d.grade}" if d.grade else "오늘의 신호: 산출 전",
+                 "",
+                 "회의록은 약 3주 뒤 공개되며, 그때 확정판 등급을 다시 알립니다.",
+                 PROVISIONAL]
+    elif d.kind == "fed_minutes":
+        subject = f"[FOMC] {d.date} 회의 회의록 반영"
+        lines = [f"{d.date} FOMC 회의록이 공개되었습니다.",
+                 f"회의록까지 반영한 확정판 등급: {d.grade} (속보치와 같음)"]
+    elif d.kind == "correction":
         subject = f"[정정] {d.date} 등급이 {d.prev_grade} → {d.grade} 로 변경"
         lines = [f"{d.date} 신호의 등급이 확정판에서 바뀌었습니다.",
                  f"{d.prev_grade} → {d.grade}",
@@ -180,6 +234,14 @@ def render(d: Decision) -> tuple:
                  "",
                  f"신뢰도 {d.confidence}",
                  PROVISIONAL]
+
+    # §2-2 같은 날 같은 회의 — 일정 알림이 이 메일에 합쳐졌으면 제목·첫 줄로 드러낸다.
+    if d.fed_event == "meeting":
+        subject = f"[FOMC] {subject}"
+        lines.insert(0, "오늘은 FOMC 결과 발표일입니다 (성명문 · 기자회견).")
+    elif d.fed_event == "minutes":
+        subject = subject.replace("[정정]", "[FOMC 회의록 · 정정]", 1)
+        lines.insert(0, f"{d.date} FOMC 회의록이 공개되었습니다.")
 
     lines += ["", DISCLAIMER, f"자세히 보기: {SIGNALS_URL}",
               "수신거부: (구독 기능 준비 중 — 드라이런)"]

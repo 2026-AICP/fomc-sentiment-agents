@@ -60,6 +60,58 @@ def test_rerun_same_day_does_not_duplicate_a_send(tmp_path, monkeypatch):
     rows = _rows(p)
     assert [r["suppressed_reason"] for r in rows] == ["", nt.SUP_ALREADY_SENT]
 
+def test_meeting_day_quiet_signal_sends_fed_notice(tmp_path, monkeypatch):
+    """회의일인데 신호가 조용하면 — 신호는 억제, 일정 알림 1통."""
+    p = _today(monkeypatch, tmp_path, "2026-07-29")
+    graph.notifier_node(_state("2026-07-29", GRADE_ALIGNED, [], statement="stmt.txt"))
+    rows = {r["kind"]: r["suppressed_reason"] for r in _rows(p)}
+    assert rows["signal"] == nt.SUP_NOT_ACTIONABLE
+    assert rows["fed_meeting"] == ""
+
+
+def test_meeting_day_red_alert_is_one_mail(tmp_path, monkeypatch):
+    """회의일에 🔴 — 신호 메일 1통에 일정이 합쳐지고, 일정 행은 merged."""
+    p = _today(monkeypatch, tmp_path, "2026-07-29")
+    graph.notifier_node(_state("2026-07-29", GRADE_ALERT, ["divergence"], statement="stmt.txt"))
+    rows = {r["kind"]: r["suppressed_reason"] for r in _rows(p)}
+    assert rows["signal"] == "" and rows["fed_meeting"] == nt.SUP_MERGED
+    assert sum(1 for r in _rows(p) if r["suppressed_reason"] == "") == 1
+
+
+def _record(date, grade):
+    """재방문 판정이 읽는 속보치 기록 — conftest 가 graph.DAILY_SIGNALS 를 임시로 돌린다."""
+    with open(graph.DAILY_SIGNALS, "w", encoding="utf-8", newline="") as f:
+        f.write("date,grade" + chr(10) + f"{date},{grade}" + chr(10))
+
+
+def test_minutes_day_with_correction_is_one_mail(tmp_path, monkeypatch):
+    """회의록 도착 + 등급 🔴→🟢 — 정정 메일 1통, 회의록 알림은 merged."""
+    p = _today(monkeypatch, tmp_path, "2026-08-19")
+    _record("2026-07-29", GRADE_ALERT)
+    st = dict(_state("2026-07-29", GRADE_ALIGNED, [], statement="stmt.txt"), fed_final=True)
+    graph.notifier_node(st)
+    rows = {r["kind"]: r["suppressed_reason"] for r in _rows(p)}
+    assert rows["correction"] == "" and rows["fed_minutes"] == nt.SUP_MERGED
+
+
+def test_minutes_day_without_change_sends_minutes_notice(tmp_path, monkeypatch):
+    """회의록 도착인데 등급 그대로 — 정정은 없고 회의록 알림 1통."""
+    p = _today(monkeypatch, tmp_path, "2026-08-19")
+    _record("2026-07-29", GRADE_ALIGNED)
+    st = dict(_state("2026-07-29", GRADE_ALIGNED, [], statement="stmt.txt"), fed_final=True)
+    graph.notifier_node(st)
+    rows = {r["kind"]: r["suppressed_reason"] for r in _rows(p)}
+    assert rows["correction"] == nt.SUP_UNCHANGED and rows["fed_minutes"] == ""
+
+
+def test_minutes_notice_needs_realtime_record(tmp_path, monkeypatch):
+    """속보치 기록이 없는 회의(과거 재처리)에는 회의록 알림을 보내지 않는다 — 소급 방지."""
+    p = _today(monkeypatch, tmp_path, "2026-08-19")
+    st = dict(_state("2008-10-29", GRADE_ALIGNED, [], statement="stmt.txt"), fed_final=True)
+    graph.notifier_node(st)
+    assert "fed_minutes" not in {r["kind"] for r in _rows(p)}
+
+
 def test_weekend_logs_no_market_row(tmp_path, monkeypatch):
     """시장 데이터가 없는 날은 등급과 무관하게 막힌다 — 2026-08-22 는 토요일."""
     p = _today(monkeypatch, tmp_path, "2026-08-22")
@@ -84,8 +136,11 @@ def test_correction_row_written_when_final_grade_differs(tmp_path, monkeypatch):
     st["fed_final"] = True
     graph.notifier_node(st)
     rows = _rows(p)
-    assert [r["kind"] for r in rows] == ["signal", "correction"]
+    assert [r["kind"] for r in rows] == ["signal", "correction", "fed_minutes"]
     assert rows[1]["suppressed_reason"] == "" and rows[1]["grade"] == GRADE_ALIGNED
+    # §2-2 회의록 알림은 같은 날 정정 메일에 합쳐진다 — 나가는 메일은 정정 1통뿐.
+    assert rows[2]["suppressed_reason"] == nt.SUP_MERGED
+    assert sum(1 for r in rows if r["suppressed_reason"] == "") == 1
 
 
 def test_first_record_is_not_a_correction(tmp_path, monkeypatch):

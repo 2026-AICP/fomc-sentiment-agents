@@ -430,23 +430,46 @@ def notifier_node(state: State) -> State:
                   today=today, sent=sent, details=sig.get("details"),
                   news_only=not state["statement_path"],
                   has_market=bool(state.get("market")))
+
+    # §2-2 FOMC 회의일 — 신호 메일과 같은 날이면 한 통으로 합친다.
+    fm = None
+    if state["statement_path"]:
+        fm = nt.decide_fed_meeting(state["date"], today, grade=d.grade, sent=sent,
+                                   signal_sends=d.send)
+        if fm.suppressed == nt.SUP_MERGED:
+            d.fed_event = "meeting"
+
     nt.append_log(d)
     if d.send:
         subject, _ = nt.render(d)
         state["log"].append(f"[notifier] 드라이런 발송 «{subject}» (신뢰도 {d.confidence})")
     else:
         state["log"].append(f"[notifier] 미발송 — {d.suppressed}")
+    if fm:
+        nt.append_log(fm)
+        state["log"].append(f"[notifier] FOMC 회의일 알림 "
+                            f"{'드라이런 발송' if fm.send else '— ' + fm.suppressed}")
 
     # §2-3 정정 알림 — 확정판에서 등급이 '실제로' 바뀐 경우만. 그 날짜가 처음
     # 기록되는 중이면(_recorded_grade 가 None) 정정이 아니라 최초 기록이다.
+    # §2-2 회의록 알림도 같은 가드를 쓴다 — 속보치 기록이 없는 회의(과거 재처리)에서
+    # 회의록 알림이 울리지 않는다.
     if state.get("fed_final"):
         prev = _recorded_grade(state["date"])
         c = prev and nt.decide_correction(state["date"], prev, sig.get("grade"),
                                           today, sent=sent)
+        mn = prev and nt.decide_fed_minutes(state["date"], sig.get("grade"), sent=sent,
+                                            correction_sends=bool(c and c.send))
+        if c and mn and mn.suppressed == nt.SUP_MERGED:
+            c.fed_event = "minutes"
         if c:
             nt.append_log(c)
             state["log"].append(f"[notifier] 정정 {prev} → {sig.get('grade')}"
                                 if c.send else f"[notifier] 정정 없음 — {c.suppressed}")
+        if mn:
+            nt.append_log(mn)
+            state["log"].append(f"[notifier] FOMC 회의록 알림 "
+                                f"{'드라이런 발송' if mn.send else '— ' + mn.suppressed}")
     return state
 
 
