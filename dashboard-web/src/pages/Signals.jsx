@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useJson, fmt, gradeInfo, firedNames, stripEmoji } from "../lib/data";
+import { useJson, fmt, gradeInfo, firedNames, stripEmoji, SUBSCRIBE_OPEN } from "../lib/data";
 import { Pill } from "../components/ui";
+import SubscribeForm from "../components/SubscribeForm";
 
 // 네 가지 판정 규칙 — 내부 코드명 대신 화면용 이름으로 설명한다.
 const SIGNAL_DEFS = [
@@ -53,6 +54,7 @@ export default function Signals() {
         회의마다 연준의 어조와 시장 반응을 미리 정한 네 가지 규칙으로 비교합니다.
         매수·매도 권고가 아니라, 살펴볼 만한 날을 표시하는 알림입니다.
       </p>
+      {SUBSCRIBE_OPEN && <SubscribeForm />}
 
       <h2 className="sec" style={{ marginTop: 8 }}>네 가지 규칙</h2>
       <div className="cards2">

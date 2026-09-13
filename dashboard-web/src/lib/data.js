@@ -2,6 +2,11 @@
 // 프론트는 계산하지 않고 표시만 한다 (환각 차단 원칙).
 import { useEffect, useState } from "react";
 
+// 구독 폼 스위치 — Worker(econpilot.org/api/*) 배포를 확인한 뒤 true 로 바꾼다.
+// 사이트는 deploy 브랜치에서 자동 빌드되므로, 배포 전에 폼이 보이면 신청이 전부
+// 실패한다 (docs/superpowers/specs/2026-09-13-alert-delivery-design.md §6-2).
+export const SUBSCRIBE_OPEN = false;
+
 const cache = {};
 
 export function useJson(name) {
