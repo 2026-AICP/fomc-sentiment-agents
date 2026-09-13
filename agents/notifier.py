@@ -61,7 +61,11 @@ SIGNALS_URL = "https://aicp-econpilot.github.io/#/signals"
 
 @dataclass
 class Decision:
-    """발송 판정 결과. send=False 면 suppressed 에 사유 코드가 담긴다."""
+    """발송 판정 결과. send=False 면 suppressed 에 사유 코드가 담긴다.
+
+    예외: send_failed 는 send=True 인 채로 발송 뒤에 붙는다 — 보내기로 판정했지만 한 명도
+    받지 못했다는 뜻이다(agents/graph.py deliver_and_log, 설계 §5-4).
+    """
     date: str
     kind: str                      # signal / correction / fed_meeting / fed_minutes
     grade: str
