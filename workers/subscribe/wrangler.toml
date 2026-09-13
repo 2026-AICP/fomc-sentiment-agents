@@ -4,8 +4,14 @@ compatibility_date = "2026-09-10"
 
 # 라우트는 econpilot.org 아래에 둔다. 수신거부 링크가 메일 발신 도메인과
 # 같아야 스팸 필터가 피싱 패턴으로 보지 않는다 (spec §5).
+#
+# Custom Domain 으로 붙인다(2026-09-13). econpilot.org 에는 A/AAAA 레코드가 없어
+# 존 라우트(econpilot.org/api/*)로는 요청이 Worker 에 닿지 않는다. Custom Domain 은
+# wrangler 가 DNS 레코드와 인증서를 자동으로 만든다. 도메인 전체가 이 Worker 로 오지만
+# /api/* 외 경로는 404 를 준다(src/index.js). 사이트는 github.io 에 있어 겹치지 않는다.
+# Resend 레코드(send.·resend._domainkey·_dmarc)는 하위 이름이라 영향 없다.
 routes = [
-  { pattern = "econpilot.org/api/*", zone_name = "econpilot.org" }
+  { pattern = "econpilot.org", custom_domain = true }
 ]
 
 # id 는 `npx wrangler kv namespace create SUBSCRIBERS` 실행 후 채운다.
