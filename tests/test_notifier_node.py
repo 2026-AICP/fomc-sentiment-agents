@@ -36,7 +36,7 @@ def _today(monkeypatch, tmp_path, date):
     return tmp_path / "notification_log.csv"
 
 
-def test_red_alert_logs_a_sent_row(tmp_path, monkeypatch):
+def test_red_alert_logs_a_sent_row(tmp_path, monkeypatch, capsys):
     p = _today(monkeypatch, tmp_path, "2026-08-20")
     out = graph.notifier_node(_state("2026-08-20", GRADE_ALERT, ["divergence"]))
     rows = _rows(p)
@@ -44,6 +44,7 @@ def test_red_alert_logs_a_sent_row(tmp_path, monkeypatch):
     assert rows[0]["suppressed_reason"] == "" and rows[0]["channel"] == "dryrun"
     assert rows[0]["n_recipients"] == "0"          # 드라이런 — 수신자 없음
     assert any("드라이런 발송" in line for line in out["log"])
+    assert "::error::" not in capsys.readouterr().out
 
 
 def test_caution_logs_a_suppressed_row(tmp_path, monkeypatch):
@@ -195,8 +196,8 @@ def test_suppressed_decision_is_not_delivered(tmp_path, monkeypatch):
     graph.notifier_node(_state("2026-08-20", GRADE_ALIGNED, []))
 
 
-def test_total_failure_is_send_failed_and_retried_on_rerun(tmp_path, monkeypatch):
-    """전원 실패면 send_failed — 같은 날 재실행에서 다시 보낸다(설계 §5-4)."""
+def test_total_failure_is_send_failed_and_not_counted_as_sent(tmp_path, monkeypatch, capsys):
+    """전원 실패면 send_failed — '보냄'으로 세지 않아 같은 날 재실행이 막히지 않고, 실행 화면에 경고가 뜬다(설계 §5-4)."""
     p = _today(monkeypatch, tmp_path, "2026-08-20")
     calls = []
 
@@ -206,6 +207,7 @@ def test_total_failure_is_send_failed_and_retried_on_rerun(tmp_path, monkeypatch
     monkeypatch.setattr(mailer, "deliver", all_fail)
     st = _state("2026-08-20", GRADE_ALERT, ["divergence"])
     out = graph.notifier_node(st)
+    assert "::error::" in capsys.readouterr().out
     row = _rows(p)[0]
     assert row["suppressed_reason"] == nt.SUP_SEND_FAILED
     assert row["channel"] == "email" and row["n_failed"] == "2"
