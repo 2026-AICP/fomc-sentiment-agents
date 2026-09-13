@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 // 구독 폼 스위치 — Worker(econpilot.org/api/*) 배포를 확인한 뒤 true 로 바꾼다.
 // 사이트는 deploy 브랜치에서 자동 빌드되므로, 배포 전에 폼이 보이면 신청이 전부
 // 실패한다 (docs/superpowers/specs/2026-09-13-alert-delivery-design.md §6-2).
-export const SUBSCRIBE_OPEN = false;
+// 2026-09-13 켬 — Worker 배포·환영 메일 발송·Cloudflare 요청 제한(§9) 확인 후.
+export const SUBSCRIBE_OPEN = true;
 
 const cache = {};
 
