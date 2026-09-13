@@ -5,7 +5,7 @@
 """
 import csv
 
-from agents import graph, notifier as nt
+from agents import graph, mailer, notifier as nt
 from analysis.signals import GRADE_ALERT, GRADE_ALIGNED, GRADE_CAUTION
 
 
@@ -158,3 +158,35 @@ def test_no_send_path_exists():
     src = open(nt.__file__, encoding="utf-8").read()
     for mod in ("smtplib", "resend", "requests", "sendgrid", "urllib"):
         assert f"import {mod}" not in src
+
+
+# --- 실제 발송 연결 (알림 발송 설계 §5 · §7) ----------------------------------
+def test_sent_decision_logs_email_channel_and_counts(tmp_path, monkeypatch):
+    p = _today(monkeypatch, tmp_path, "2026-08-20")
+    monkeypatch.setattr(mailer, "deliver",
+                        lambda d: ("email", 3, 1, ["발송 실패 1/3"]))
+    out = graph.notifier_node(_state("2026-08-20", GRADE_ALERT, ["divergence"]))
+    row = _rows(p)[0]
+    assert row["channel"] == "email"
+    assert row["n_recipients"] == "3" and row["n_failed"] == "1"
+    assert any("[mailer] 발송 실패 1/3" in line for line in out["log"])
+
+
+def test_delivery_exception_does_not_crash_node(tmp_path, monkeypatch):
+    p = _today(monkeypatch, tmp_path, "2026-08-20")
+
+    def boom(d):
+        raise RuntimeError("resend down")
+    monkeypatch.setattr(mailer, "deliver", boom)
+    out = graph.notifier_node(_state("2026-08-20", GRADE_ALERT, ["divergence"]))
+    assert _rows(p)[0]["channel"] == "email"
+    assert any("발송 단계 예외" in line for line in out["log"])
+
+
+def test_suppressed_decision_is_not_delivered(tmp_path, monkeypatch):
+    _today(monkeypatch, tmp_path, "2026-08-20")
+
+    def must_not_call(d):
+        raise AssertionError("억제된 결정을 보내면 안 된다")
+    monkeypatch.setattr(mailer, "deliver", must_not_call)
+    graph.notifier_node(_state("2026-08-20", GRADE_ALIGNED, []))

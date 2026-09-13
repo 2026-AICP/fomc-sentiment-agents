@@ -29,3 +29,5 @@ def _isolate_production_outputs(monkeypatch, tmp_path):
     monkeypatch.setattr(graph, "DAILY_SIGNALS", tmp_path / "daily_signals.csv")
     monkeypatch.setattr(notifier, "NOTIFICATION_LOG", tmp_path / "notification_log.csv")
     monkeypatch.setattr(vintage, "MEETING_VINTAGE", tmp_path / "vintage_meetings.csv")
+    # 개발자 셸에 ALERT_SEND=1 이 켜져 있어도 테스트는 절대 실제 메일을 보내지 않는다.
+    monkeypatch.delenv("ALERT_SEND", raising=False)
