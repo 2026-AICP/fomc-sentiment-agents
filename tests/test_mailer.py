@@ -139,3 +139,31 @@ def test_notes_never_contain_addresses():
     _, _, _, notes = mailer.deliver(_alert(), env=ON, post=post, sleep=lambda s: None,
                                     get=lambda *a, **k: Resp(401))
     assert notes and all("@" not in x for x in notes)
+
+
+def test_idempotency_key_stable_per_mail_and_recipient():
+    """같은 알림을 같은 사람에게 다시 요청하면 같은 키 → Resend 가 24시간 안 중복을 막는다(설계 §5-5)."""
+    seen = []
+
+    def post(url, json=None, headers=None, timeout=None):
+        seen.append(headers["Idempotency-Key"])
+        return Resp(200)
+    for _ in range(2):
+        mailer.deliver(_alert(), env=ON, post=post, sleep=lambda s: None, get=_export())
+    assert seen[:2] == seen[2:]                    # 재실행 → 같은 키
+    assert seen[0] != seen[1]                      # 수신자마다 다른 키
+    assert all("@" not in k for k in seen)         # 키에 주소가 드러나지 않는다
+
+
+def test_idempotency_key_differs_by_kind():
+    """같은 날 같은 사람에게 가는 신호 메일과 FOMC 일정 메일은 서로 막으면 안 된다."""
+    seen = []
+
+    def post(url, json=None, headers=None, timeout=None):
+        seen.append(headers["Idempotency-Key"])
+        return Resp(200)
+    env = dict(ON, ALERT_RECIPIENTS="a@team.org")
+    mailer.deliver(_alert(), env=env, post=post, sleep=lambda s: None, get=_export())
+    mailer.deliver(decide_fed_meeting(TODAY, TODAY, grade=GRADE_NEUTRAL), env=env,
+                   post=post, sleep=lambda s: None, get=_export())
+    assert seen[0] != seen[1]
