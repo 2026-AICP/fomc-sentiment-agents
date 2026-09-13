@@ -426,7 +426,12 @@ def notifier_node(state: State) -> State:
         return state
 
     def deliver_and_log(dec, label):
-        """send 인 결정은 발송하고, 결과와 함께 로그 1행. 발송 예외는 삼킨다."""
+        """send 인 결정은 발송하고, 결과와 함께 로그 1행. 발송 예외는 삼킨다.
+
+        한 명도 받지 못했으면(수신자 0명 · 전원 실패 · 발송 단계 예외) send_failed 로
+        남긴다. read_sent 가 사유 있는 행을 세지 않으므로 다음 실행에서 다시 판정된다 —
+        받은 사람이 없으니 두 통이 갈 일도 없다(설계 §5-4). 일부만 실패하면 '보냄'이다.
+        """
         channel, n, failed = nt.CHANNEL_DRYRUN, None, None
         if dec.send:
             try:
@@ -436,7 +441,13 @@ def notifier_node(state: State) -> State:
                 notes = [f"발송 단계 예외: {type(e).__name__}"]
             for msg in notes:
                 state["log"].append(f"[mailer] {msg}")
+            if channel == nt.CHANNEL_EMAIL and (n == 0 or failed == n):
+                dec.suppressed = nt.SUP_SEND_FAILED
         nt.append_log(dec, channel=channel, n_recipients=n, n_failed=failed)
+        if dec.suppressed == nt.SUP_SEND_FAILED:
+            state["log"].append(f"[notifier] {label} 발송 실패 — 받은 사람 없음 "
+                                f"(수신 {n} · 실패 {failed}), 다음 실행에서 재시도")
+            return
         if not dec.send:
             state["log"].append(f"[notifier] {label} 미발송 — {dec.suppressed}")
             return
