@@ -408,20 +408,43 @@ def _recorded_grade(date, out=None):
 def notifier_node(state: State) -> State:
     """규칙 기반 발송 판정 — 판단 없이 전달만 한다(§10-5).
 
-    **실제 발송은 하지 않는다.** agents/notifier.py 가 smtplib·resend 를 import 하지
-    않으므로 호출할 발송 함수 자체가 없다. 남기는 것은 outputs/notification_log.csv
-    한 행뿐이고, 억제된 날도 사유 코드와 함께 남긴다 — 그래야 "며칠에 한 번 나갔을까"가
-    로그만 보고 나온다(§7-1).
+    판정은 agents/notifier.py, 발송은 agents/mailer.py 가 한다. 실제 메일은 저장소
+    변수 ALERT_SEND 가 "1" 일 때만 나가고, 그 외에는 드라이런이다
+    (docs/superpowers/specs/2026-09-13-alert-delivery-design.md §6-1).
+
+    판정마다 outputs/notification_log.csv 에 한 행을 남기되 **발송 뒤에** 쓴다 —
+    수신자 수를 알아야 기록할 수 있다. 억제된 결정도 사유 코드와 함께 남긴다(§7-1).
 
     reporting 앞에 두는 이유: reporting 이 daily_signals.csv 를 쓰기 전이라
     _recorded_grade() 가 '이번 실행 이전'의 속보치를 읽는다. 정정 판정(§2-3)이
     자기 자신과 비교하는 사고를 막는다.
     """
-    from agents import notifier as nt
+    from agents import mailer, notifier as nt
     sig = state.get("signals") or {}
     if not sig:
         state["log"].append("[notifier] 등급 없음 → 건너뜀")
         return state
+
+    def deliver_and_log(dec, label):
+        """send 인 결정은 발송하고, 결과와 함께 로그 1행. 발송 예외는 삼킨다."""
+        channel, n, failed = nt.CHANNEL_DRYRUN, None, None
+        if dec.send:
+            try:
+                channel, n, failed, notes = mailer.deliver(dec)
+            except Exception as e:      # 발송이 파이프라인을 죽이지 않는다 (설계 §5-4)
+                channel, n, failed = nt.CHANNEL_EMAIL, 0, 0
+                notes = [f"발송 단계 예외: {type(e).__name__}"]
+            for msg in notes:
+                state["log"].append(f"[mailer] {msg}")
+        nt.append_log(dec, channel=channel, n_recipients=n, n_failed=failed)
+        if not dec.send:
+            state["log"].append(f"[notifier] {label} 미발송 — {dec.suppressed}")
+            return
+        subject, _ = nt.render(dec)
+        if channel == nt.CHANNEL_DRYRUN:
+            state["log"].append(f"[notifier] {label} 드라이런 발송 «{subject}»")
+        else:
+            state["log"].append(f"[notifier] {label} 발송 «{subject}» — 수신 {n} · 실패 {failed}")
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     sent = nt.read_sent()
@@ -439,16 +462,9 @@ def notifier_node(state: State) -> State:
         if fm.suppressed == nt.SUP_MERGED:
             d.fed_event = "meeting"
 
-    nt.append_log(d)
-    if d.send:
-        subject, _ = nt.render(d)
-        state["log"].append(f"[notifier] 드라이런 발송 «{subject}» (신뢰도 {d.confidence})")
-    else:
-        state["log"].append(f"[notifier] 미발송 — {d.suppressed}")
+    deliver_and_log(d, f"신호(신뢰도 {d.confidence})")
     if fm:
-        nt.append_log(fm)
-        state["log"].append(f"[notifier] FOMC 회의일 알림 "
-                            f"{'드라이런 발송' if fm.send else '— ' + fm.suppressed}")
+        deliver_and_log(fm, "FOMC 회의일 알림")
 
     # §2-3 정정 알림 — 확정판에서 등급이 '실제로' 바뀐 경우만. 그 날짜가 처음
     # 기록되는 중이면(_recorded_grade 가 None) 정정이 아니라 최초 기록이다.
@@ -463,13 +479,9 @@ def notifier_node(state: State) -> State:
         if c and mn and mn.suppressed == nt.SUP_MERGED:
             c.fed_event = "minutes"
         if c:
-            nt.append_log(c)
-            state["log"].append(f"[notifier] 정정 {prev} → {sig.get('grade')}"
-                                if c.send else f"[notifier] 정정 없음 — {c.suppressed}")
+            deliver_and_log(c, f"정정 {prev} → {sig.get('grade')}")
         if mn:
-            nt.append_log(mn)
-            state["log"].append(f"[notifier] FOMC 회의록 알림 "
-                                f"{'드라이런 발송' if mn.send else '— ' + mn.suppressed}")
+            deliver_and_log(mn, "FOMC 회의록 알림")
     return state
 
 

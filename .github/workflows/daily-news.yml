@@ -27,6 +27,13 @@ jobs:
       # 국채금리(2Y/10Y) 조회용. 없어도 공개 CSV 로 폴백하지만, 키가 있으면
       # 레이트리밋에 덜 걸려 결측이 줄어든다(결측이 기존 값을 지우진 않음 — upsert COALESCE).
       FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      # 알림 실제 발송 (docs/superpowers/specs/2026-09-13-alert-delivery-design.md §10).
+      # ALERT_SEND 는 Secret 이 아니라 저장소 변수(vars)라 커밋 없이 켜고 끈다.
+      # "1" 이 아니면 agents/mailer.py 는 네트워크를 쓰지 않는다(드라이런).
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ALERT_RECIPIENTS: ${{ secrets.ALERT_RECIPIENTS }}   # 팀 고정 명단, 쉼표 구분
+      SUBSCRIBERS_TOKEN: ${{ secrets.SUBSCRIBERS_TOKEN }} # Worker /api/export 인증
+      ALERT_SEND: ${{ vars.ALERT_SEND }}
     steps:
       - name: Checkout deploy branch
         uses: actions/checkout@v4
