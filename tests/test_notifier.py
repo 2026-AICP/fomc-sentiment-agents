@@ -16,11 +16,14 @@ from agents.notifier import (
     SUP_NO_MARKET,
     SUP_NOT_ACTIONABLE,
     SUP_NOT_TODAY,
+    SUP_MERGED,
     SUP_UNCHANGED,
     append_log,
     confidence_label,
     decide,
     decide_correction,
+    decide_fed_meeting,
+    decide_fed_minutes,
     read_sent,
     render,
 )
@@ -95,6 +98,45 @@ def test_no_market_checked_before_grade():
 def test_market_present_still_sends():
     d = decide(TODAY, GRADE_ALERT, ["divergence"], has_market=True, **OK)
     assert d.send and d.suppressed is None
+
+# --- §2-2 Fed 공식 일정 — 같은 날 같은 회의는 한 통 ---------------------------
+def test_fed_meeting_sends_when_signal_does_not():
+    d = decide_fed_meeting(TODAY, TODAY, grade=GRADE_NEUTRAL, signal_sends=False)
+    assert d.send and d.kind == "fed_meeting"
+
+def test_fed_meeting_merges_into_signal_mail():
+    """🔴 알림이 나가는 회의일엔 일정 알림을 따로 보내지 않고 그 메일에 합친다."""
+    d = decide_fed_meeting(TODAY, TODAY, grade=GRADE_ALERT, signal_sends=True)
+    assert not d.send and d.suppressed == SUP_MERGED
+
+def test_fed_meeting_not_today_on_revisit():
+    """회의록 재방문 실행에서는 회의일 알림을 다시 보내지 않는다."""
+    d = decide_fed_meeting("2026-07-29", TODAY, grade=GRADE_NEUTRAL)
+    assert not d.send and d.suppressed == SUP_NOT_TODAY
+
+def test_fed_meeting_blocked_if_signal_already_sent():
+    """재실행 — 합쳐진 신호 메일이 이미 나갔으면 일정 알림도 나간 것으로 본다."""
+    d = decide_fed_meeting(TODAY, TODAY, grade=GRADE_ALERT, sent={(TODAY, "signal")})
+    assert not d.send and d.suppressed == SUP_ALREADY_SENT
+
+def test_fed_minutes_sends_when_no_correction():
+    d = decide_fed_minutes("2026-07-29", GRADE_ALIGNED, correction_sends=False)
+    assert d.send and d.kind == "fed_minutes"
+
+def test_fed_minutes_merges_into_correction_mail():
+    """회의록 도착일에 정정이 나가면 한 통으로 합친다."""
+    d = decide_fed_minutes("2026-07-29", GRADE_ALIGNED, correction_sends=True)
+    assert not d.send and d.suppressed == SUP_MERGED
+
+def test_fed_minutes_blocked_if_correction_already_sent():
+    d = decide_fed_minutes("2026-07-29", GRADE_ALIGNED, sent={("2026-07-29", "correction")})
+    assert not d.send and d.suppressed == SUP_ALREADY_SENT
+
+def test_merged_signal_mail_says_fomc():
+    d = decide(TODAY, GRADE_ALERT, ["divergence"], **OK)
+    d.fed_event = "meeting"
+    subject, body = render(d)
+    assert "FOMC" in subject and "기자회견" in body
 
 def test_correction_silent_when_neither_grade_is_alert():
     """전후 어느 쪽도 🔴 이 아니면 정정을 보내지 않는다.
