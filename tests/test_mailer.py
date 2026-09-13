@@ -167,3 +167,19 @@ def test_idempotency_key_differs_by_kind():
     mailer.deliver(decide_fed_meeting(TODAY, TODAY, grade=GRADE_NEUTRAL), env=env,
                    post=post, sleep=lambda s: None, get=_export())
     assert seen[0] != seen[1]
+
+
+def test_idempotency_key_changes_when_content_changes():
+    """같은 날·같은 종류·같은 사람이라도 내용이 달라지면 다른 키 — Resend 409 방지(설계 §5-5)."""
+    seen = []
+
+    def post(url, json=None, headers=None, timeout=None):
+        seen.append(headers["Idempotency-Key"])
+        return Resp(200)
+    env = dict(ON, ALERT_RECIPIENTS="a@team.org")
+    plain = _alert()
+    merged = _alert()
+    merged.fed_event = "meeting"
+    mailer.deliver(plain, env=env, post=post, sleep=lambda s: None, get=_export())
+    mailer.deliver(merged, env=env, post=post, sleep=lambda s: None, get=_export())
+    assert seen[0] != seen[1]

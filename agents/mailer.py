@@ -107,14 +107,17 @@ def _payload(recipient, decision):
     return payload
 
 
-def _idempotency_key(recipient, decision):
-    """Resend 중복 방지 키 (설계 §5-5). 같은 알림 종류·날짜·사람이면 같은 키.
+def _idempotency_key(recipient, decision, payload):
+    """Resend 중복 방지 키 (설계 §5-5). 같은 메일(종류·날짜·사람·제목·본문)이면 같은 키.
 
-    해시라 주소가 드러나지 않는다. Resend 는 24시간 동안 키를 기억하므로 같은 날
-    재실행의 중복만 막는다 — 로그 push 실패로 다음 날 다시 판정되는 경우의 주 방어선은
-    daily-news.yml 의 push 재시도다.
+    해시라 주소가 드러나지 않는다. 제목·본문을 넣는 이유: Resend 는 같은 키에 다른
+    내용이 오면 409 로 거절하므로, 같은 날 재실행에서 FOMC 일정 합치기 여부가 바뀌어
+    내용이 달라지면 키도 달라져야 재시도가 막히지 않는다. Resend 는 24시간 동안 키를
+    기억하므로 같은 날 재실행의 중복만 막는다 — 로그 push 실패로 다음 날 다시 판정되는
+    경우의 주 방어선은 daily-news.yml 의 push 재시도다.
     """
-    raw = "|".join([decision.kind, decision.date, recipient["email"]])
+    raw = "|".join([decision.kind, decision.date, recipient["email"],
+                    payload["subject"], payload["text"]])
     return "econpilot-" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:40]
 
 
@@ -146,9 +149,10 @@ def deliver(decision, env=None, get=requests.get, post=requests.post, sleep=time
         if i:
             sleep(SEND_GAP_SEC)
         try:
-            r = post(RESEND_URL, json=_payload(rcp, decision),
+            payload = _payload(rcp, decision)
+            r = post(RESEND_URL, json=payload,
                      headers={"Authorization": f"Bearer {key}",
-                              "Idempotency-Key": _idempotency_key(rcp, decision)},
+                              "Idempotency-Key": _idempotency_key(rcp, decision, payload)},
                      timeout=TIMEOUT)
             if not 200 <= r.status_code < 300:
                 failed += 1
