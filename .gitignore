@@ -34,3 +34,6 @@ dashboard-web/dist/
 dashboard-web/public/data/
 
 node_modules/
+
+# wrangler 로컬 캐시
+workers/subscribe/.wrangler/
