@@ -43,7 +43,7 @@ SUP_BELOW_LEVEL = "level_below_alert"    # §2-1 기본값 🔴, ⚠️ 는 구�
 SUP_ALREADY_SENT = "already_sent"        # 같은 날짜·종류 재발송 금지
 SUP_UNCHANGED = "grade_unchanged"        # §2-3 등급이 그대로인 확정판 전환
 SUP_MERGED = "merged_same_day"           # §2-2 같은 날 같은 회의의 다른 메일에 합쳐짐
-SUP_SEND_FAILED = "send_failed"          # 발송 시도했으나 한 명도 못 받음 — 다음 실행에서 재판정
+SUP_SEND_FAILED = "send_failed"          # 발송 시도했으나 한 명도 못 받음 — '보냄'으로 세지 않음(자동 재발송 아님, 설계 §5-4)
 
 LEVEL_ALERT = "alert"        # 🔴 만
 LEVEL_CAUTION = "caution"    # ⚠️ 이상
