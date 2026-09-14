@@ -72,14 +72,21 @@ function Ticker() {
 export default function App() {
   const [page, setPage] = useState("home");
   const { data: meta } = useJson("meta");
-  const updated = meta?.generated_at?.slice(0, 10);
+  // generated_at 은 UTC 다. 앞 10자리만 자르면 한국 아침(UTC 전날 밤)에 만든 데이터가
+  // 하루 전 날짜로 보이므로 한국시간으로 바꿔 날짜·시각을 함께 보여준다.
+  const updated = meta?.generated_at
+    ? new Intl.DateTimeFormat("sv-SE", {
+        timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit",
+      }).format(new Date(meta.generated_at))
+    : null;
 
   return (
     <>
       <div className="util">
         <div className="wrap">
           <span>연준 문서와 경제뉴스의 감성 분석</span>
-          <span>매일 오전 7시 업데이트{updated ? ` · 최근 ${updated}` : ""}</span>
+          <span>매일 아침 업데이트{updated ? ` · 최근 ${updated} (한국시간)` : ""}</span>
           <span className="right">2026-AICP · Econpilot</span>
         </div>
       </div>
