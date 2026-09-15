@@ -11,3 +11,4 @@ date,kind,grade,fired,channel,n_recipients,n_failed,suppressed_reason
 2026-09-13,signal,⚪ 중립,,dryrun,,,no_market_data
 2026-09-13,signal,⚪ 중립,,dryrun,,,no_market_data
 2026-09-14,signal,⚪ 중립,,dryrun,,,not_today
+2026-09-15,signal,🟢 정합,,dryrun,,,grade_not_actionable
