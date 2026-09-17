@@ -1,10 +1,11 @@
 import {
   useJson, fmt, gradeInfo, confidenceLevel, firedNames, FIRED_KO,
 } from "../lib/data";
+import { fedAxisStatus } from "../lib/fedAxis";
 
-/** 부호에 따라 색을 주는 숫자. 값이 없으면 '—'. */
-function N({ v, d = 3, suffix = "" }) {
-  if (v == null) return <span className="na">—</span>;
+/** 부호에 따라 색을 주는 숫자. 값이 없으면 '대기'(아직 안 온 문서) 또는 '—'. */
+function N({ v, d = 3, suffix = "", pending = false }) {
+  if (v == null) return <span className="na">{pending ? "대기" : "—"}</span>;
   return <span className={`num ${v > 0 ? "pos" : v < 0 ? "neg" : ""}`}>{fmt(v, d)}{suffix}</span>;
 }
 
@@ -40,6 +41,7 @@ export default function Home() {
   const { data: minutes } = useJson("minutes");
   const { data: presser } = useJson("presser");
   const { data: meta } = useJson("meta");
+  const { data: axis } = useJson("axis_status");      // 연준 값에 들어간 문서(잠정·확정 표시)
 
   if (!dsAll?.length || !combined?.length || !market?.length || !meetings?.length || !meta)
     return <div className="loading">데이터 로딩…</div>;
@@ -53,6 +55,7 @@ export default function Home() {
 
   // ── 2단: 근거 — 통합 감성지수 ↔ 시장 반응, 짝으로 배치 ──
   const comb = combined.find((r) => r.date === ds.date) || combined[combined.length - 1];
+  const fedSt = fedAxisStatus(axis, comb?.date);
   const combSeries = combined.map((r) => r.index).filter((v) => v != null).slice(-30);
 
   const asOf = new Date(mkt.date);
@@ -137,12 +140,13 @@ export default function Home() {
       <div className="evidence-grid">
         <div className="card">
           <div className="ev-pad">
-            <div className="ev-lbl">통합 감성지수 (Fed:뉴스 = 1:1)</div>
+            <div className="ev-lbl">통합 감성지수 (연준:뉴스 = 1:1)</div>
             <div className={`ev-big num ${ds.index > 0 ? "pos" : ds.index < 0 ? "neg" : ""}`}>
               {fmt(ds.index)}
             </div>
             <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              Fed <N v={comb?.fed} /> · 뉴스 <N v={comb?.news_z ?? comb?.news} />
+              연준 <N v={comb?.fed} />{fedSt && !fedSt.final && " (잠정)"} · 뉴스 <N v={comb?.news_z ?? comb?.news} />
+              <span style={{ opacity: 0.7 }}> · 표준화 점수</span>
             </div>
             <div className="ev-foot">
               <div style={{ fontSize: 12.5, color: "var(--muted)" }}>최근 {combSeries.length}일 흐름</div>
@@ -186,10 +190,11 @@ export default function Home() {
       <h2 className="sec">세부 구성 지표</h2>
       <div className="detail-grid">
         <div className="card dcard ev-pad">
-          <h3>Fed 축 상세 · {lastMeet.date} 회의</h3>
+          {/* 문서별 원점수 — 위 '연준' 값(표준화 점수)과 척도가 다르다는 것을 제목에 밝힌다 */}
+          <h3>연준 문서별 원점수 · {lastMeet.date} 회의</h3>
           <div className="drow"><span>성명문</span><N v={lastMeet.tone} /></div>
-          <div className="drow"><span>회의록</span><N v={lastMn?.minutes} /></div>
-          <div className="drow"><span>기자회견</span><N v={lastPr?.presser} /></div>
+          <div className="drow"><span>회의록</span><N v={lastMn?.minutes} pending={!fedSt?.final} /></div>
+          <div className="drow"><span>기자회견</span><N v={lastPr?.presser} pending={!fedSt?.final} /></div>
         </div>
         <div className="card dcard ev-pad">
           <h3>뉴스 감성 신뢰도</h3>
