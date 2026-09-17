@@ -16,6 +16,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from typing import Optional, TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -463,7 +464,10 @@ def notifier_node(state: State) -> State:
         else:
             state["log"].append(f"[notifier] {label} 발송 «{subject}» — 수신 {n} · 실패 {failed}")
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # '오늘'은 파이프라인 날짜(run_news_daily.sh 의 TODAY_ET)와 같은 시계(ET)로 잰다.
+    # UTC 로 재면 크론 지연으로 실행이 00:00Z 를 넘기는 날 date 와 하루 어긋나
+    # 당일 알림이 not_today 로 억제된다 — 2026-09-16 회의일 알림이 실제로 이렇게 유실됐다.
+    today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
     sent = nt.read_sent()
     d = nt.decide(state["date"], sig.get("grade", "—"), sig.get("fired") or [],
                   sig.get("n_articles"), sig.get("ci_lo"), sig.get("ci_hi"),

@@ -128,6 +128,28 @@ def test_backfilled_date_is_never_sent(tmp_path, monkeypatch):
     assert _rows(p)[0]["suppressed_reason"] == nt.SUP_NOT_TODAY
 
 
+def test_utc_midnight_boundary_keeps_todays_alert(tmp_path, monkeypatch):
+    """크론 지연으로 notifier 가 UTC 자정을 넘겨 돌아도(00:01Z) ET 오늘이면 발송된다.
+
+    2026-09-16 회의일 알림이 정확히 이렇게 유실됐다 — 파이프라인 날짜는
+    ET(run_news_daily.sh 의 TODAY_ET = 9/16)인데 notifier 의 '오늘'이 UTC(9/17)라서
+    당일 알림이 not_today 로 억제됐다. '오늘'은 파이프라인과 같은 시계(ET)여야 한다.
+    """
+    monkeypatch.setattr(nt, "NOTIFICATION_LOG", tmp_path / "notification_log.csv")
+
+    class _DT:
+        @staticmethod
+        def now(tz=None):
+            import datetime as _d
+            instant = _d.datetime.fromisoformat("2026-09-17T00:01:00+00:00")
+            return instant.astimezone(tz) if tz else instant
+    monkeypatch.setattr(graph, "datetime", _DT)
+    graph.notifier_node(_state("2026-09-16", GRADE_ALIGNED, [], statement="stmt.txt"))
+    rows = {r["kind"]: r["suppressed_reason"] for r in _rows(tmp_path / "notification_log.csv")}
+    assert rows["fed_meeting"] == ""               # not_today 로 죽으면 안 된다
+    assert rows["signal"] == nt.SUP_NOT_ACTIONABLE  # 등급 억제는 그대로
+
+
 def test_correction_row_written_when_final_grade_differs(tmp_path, monkeypatch):
     """7/29 처럼 회의록 도착 후 🔴 → 🟢 로 뒤집힌 경우(§2-3)."""
     p = _today(monkeypatch, tmp_path, "2026-08-29")
