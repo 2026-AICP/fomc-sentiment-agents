@@ -128,7 +128,9 @@ h2.sec { font-size: 16px; font-weight: 650; margin: 26px 0 10px; letter-spacing:
   text-transform: uppercase; letter-spacing: 0.04em; }
 .kpi .big { font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
   margin: 3px 0 1px; font-variant-numeric: tabular-nums;
-  display: flex; align-items: center; gap: 8px; }
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.kpi .big .unit { font-size: 11.5px; font-weight: 600; color: var(--muted);
+  letter-spacing: 0; margin-left: -2px; }
 .kpi .mt { font-size: 11.5px; color: var(--muted); }
 
 .pill { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px;

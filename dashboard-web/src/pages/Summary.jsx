@@ -1,4 +1,5 @@
 import { useJson, fmt, toneLabel, confidenceLevel } from "../lib/data";
+import { fedAxisStatus } from "../lib/fedAxis";
 
 /** 부호에 따라 색을 주는 숫자. 값이 없으면 '대기'(아직 안 온 축) 또는 '—'. */
 function N({ v, d = 3, suffix = "", pending = false }) {
@@ -64,6 +65,7 @@ export default function Summary() {
   // 신뢰도는 그날 뉴스 표본으로 판정한다 — 통합값이 흔들리는 원인은 뉴스 쪽이기 때문.
   const series = combined.map((d) => d.index).filter((v) => v != null).slice(-30);
   const last = combined[combined.length - 1] || {};
+  const fedSt = fedAxisStatus(axis, last.date);
   const lastNews = daily.find((d) => d.date === last.date) || daily[daily.length - 1] || {};
   const rows = alerts.slice(-8).reverse();
 
@@ -142,7 +144,7 @@ export default function Summary() {
               {/* 표시값은 결합에 실제로 들어간 z 값이다. 뉴스 원값(-1~+1)을 그대로
                   보여주면 "1:1 결합"이 계산과 맞지 않아 보인다(2026-09 지적). */}
               <div className="sub2">
-                Fed <N v={last.fed} /> · 뉴스 <N v={last.news_z ?? last.news} /> 를 1:1 로 결합
+                연준 <N v={last.fed} />{fedSt && !fedSt.final && " (잠정)"} · 뉴스 <N v={last.news_z ?? last.news} /> 를 1:1 로 결합
                 <span style={{ opacity: 0.6 }}> (표준화 점수)</span>
               </div>
               <div className="sub2">최근 {series.length}일 흐름</div>
