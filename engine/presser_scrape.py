@@ -48,9 +48,14 @@ def detect_chair(text: str):
 
 
 def _strip_page_noise(text: str) -> str:
-    """페이지 머리말('... Press Conference FINAL')·쪽번호('Page X of Y') 제거."""
-    text = re.sub(r"[A-Z][a-z]+ \d{1,2}, \d{4}\s+Chair(?:man)?\s+\w+[’'`]s Press Conference\s+FINAL",
-                  " ", text)
+    """페이지 머리말('... Press Conference FINAL/PRELIMINARY')·쪽번호('Page X of Y') 제거.
+
+    연준은 원고를 먼저 PRELIMINARY(잠정본)로 올리고 나중에 FINAL 로 교체한다. 수집은
+    게시 직후에 일어나므로 대개 잠정본을 받는다 — 머리말이 페이지 경계마다 의장 발언
+    한가운데 끼므로 둘 다 지워야 한다(2026-09-16 원고 9조각, 07-29 저장본 2조각 실측).
+    """
+    text = re.sub(r"[A-Z][a-z]+ \d{1,2}, \d{4}\s+Chair(?:man)?\s+\w+[’'`]s Press Conference"
+                  r"\s+(?:FINAL|PRELIMINARY)", " ", text)
     text = re.sub(r"Page \d+ of \d+", " ", text)
     return text
 
