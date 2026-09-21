@@ -67,3 +67,28 @@ def test_no_title_returns_empty():
 
 def test_presser_url_pattern():
     assert presser_url("2026-06-17").endswith("/FOMCpresconf20260617.pdf")
+
+
+# 연준은 원고를 먼저 PRELIMINARY(잠정본)로 올리고 나중에 FINAL 로 바꾼다. 페이지 머리글이
+# 의장 발언 한가운데(페이지가 넘어가는 자리)에 끼므로 잠정본 머리글도 지워야 한다.
+# 실측: 2026-09-16 원고에서 9조각, 2026-07-29 저장본에서 2조각이 문장 안에 남았다.
+WARSH_PRELIM = """September 16, 2026 Chairman Warsh’s Press Conference PRELIMINARY 
+ 
+Page 1 of 2 
+ 
+Transcript of Chairman Warsh’s Press Conference 
+September 16, 2026 
+ 
+CHAIRMAN WARSH.  Good day. Resilience and the potential for even September 16, 2026 Chairman Warsh’s Press Conference PRELIMINARY 
+ 
+Page 2 of 2 
+ 
+greater performance are why optimism is warranted.
+
+MICHELLE SMITH.  Thank you."""
+
+
+def test_preliminary_page_header_is_stripped():
+    r = extract_chair_remarks(WARSH_PRELIM)
+    assert "PRELIMINARY" not in r and "Press Conference" not in r   # 머리글 조각이 남지 않는다
+    assert "potential for even greater performance" in r            # 끊긴 문장이 다시 이어진다

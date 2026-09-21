@@ -14,6 +14,7 @@ torch
 # Phase 3+ — 수집 (engine/scrape.py)
 requests
 beautifulsoup4
+pypdf   # engine/presser_scrape.py — 기자회견 원고(PDF) 읽기
 # pdfminer.six
 
 # Phase 5 — 시장 데이터
