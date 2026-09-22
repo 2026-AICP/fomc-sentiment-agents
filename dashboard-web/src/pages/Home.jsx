@@ -2,6 +2,7 @@ import {
   useJson, fmt, gradeInfo, confidenceLevel, firedNames, FIRED_KO,
 } from "../lib/data";
 import { fedAxisStatus } from "../lib/fedAxis";
+import { homeIndex } from "../lib/homeIndex";
 
 /** 부호에 따라 색을 주는 숫자. 값이 없으면 '대기'(아직 안 온 문서) 또는 '—'. */
 function N({ v, d = 3, suffix = "", pending = false }) {
@@ -55,6 +56,7 @@ export default function Home() {
 
   // ── 2단: 근거 — 통합 감성지수 ↔ 시장 반응, 짝으로 배치 ──
   const comb = combined.find((r) => r.date === ds.date) || combined[combined.length - 1];
+  const idx = homeIndex(ds, combined);   // 감성지수 탭과 같은 값 (lib/homeIndex.js)
   const fedSt = fedAxisStatus(axis, comb?.date);
   const combSeries = combined.map((r) => r.index).filter((v) => v != null).slice(-30);
 
@@ -64,7 +66,7 @@ export default function Home() {
   const hist = (key) => market.filter((r) => r.date >= cut).map((r) => r[key]).filter((v) => v != null);
 
   const divergenceFired = ds.fired.includes("divergence");
-  const sameSign = sign(ds.index) !== 0 && sign(ds.index) === sign(reaction);
+  const sameSign = sign(idx) !== 0 && sign(idx) === sign(reaction);
   const conn = divergenceFired
     ? { icon: "⇄", color: "var(--crit)", label: "부호 반대 · 괴리" }
     : sameSign
@@ -109,7 +111,7 @@ export default function Home() {
         <div className="hero-body">
           <div className="hero-date">{ds.date}</div>
           <div className="hero-why">
-            톤 <N v={ds.index} /> · 시장 반응 <N v={reaction} d={2} suffix="%" /> ·{" "}
+            톤 <N v={idx} /> · 시장 반응 <N v={reaction} d={2} suffix="%" /> ·{" "}
             {ds.fired.length ? `발동 규칙: ${firedNames(ds.fired)}` : "발동한 규칙 없음"}
           </div>
           <div className="fired-chips">
@@ -141,8 +143,8 @@ export default function Home() {
         <div className="card">
           <div className="ev-pad">
             <div className="ev-lbl">통합 감성지수 (연준:뉴스 = 1:1)</div>
-            <div className={`ev-big num ${ds.index > 0 ? "pos" : ds.index < 0 ? "neg" : ""}`}>
-              {fmt(ds.index)}
+            <div className={`ev-big num ${idx > 0 ? "pos" : idx < 0 ? "neg" : ""}`}>
+              {fmt(idx)}
             </div>
             <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
               연준 <N v={comb?.fed} />{fedSt && !fedSt.final && " (잠정)"} · 뉴스 <N v={comb?.news_z ?? comb?.news} />
