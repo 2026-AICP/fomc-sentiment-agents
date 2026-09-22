@@ -33,11 +33,15 @@ from analysis.axis_status import pending_meetings, write_status
 # 세 축은 도착 시각이 다르다(성명문 당일 / 기자회견 며칠 후 / 회의록 3주 후).
 # 오늘 날짜만 처리하면 늦게 도착하는 축을 영원히 놓치므로, 최근 6개월 회의 중
 # 아직 3축이 안 찬 것을 매일 다시 돌려 새로 도착한 축을 흡수한다.
+# ★재방문을 먼저, 오늘을 마지막에(2026-09-22). 오늘 신호는 DB 의 연준 결합값을 이월해
+#   쓰므로 새로 도착한 축을 먼저 흡수해야 같은 실행의 최신 값을 쓴다. 거꾸로 돌던 때
+#   9/16 기자회견이 도착한 날 오늘 신호만 옛 값(성명문 단독)으로 계산돼, 홈(daily_signals
+#   0.181)과 새 값으로 다시 계산한 ②의 감성지수 탭(daily_headline 0.284)이 어긋났다.
 today = sys.argv[1]
 pending = [d for d in pending_meetings() if d != today]
 if pending:
     print(f"  재방문(축 미완성): {pending}")
-graph.orchestrate(dates=[today] + pending)   # 신호 A~D(offset=0) → outputs/daily_signals.csv
+graph.orchestrate(dates=pending + [today])   # 신호 A~D(offset=0) → outputs/daily_signals.csv
 write_status()                               # outputs/axis_status.csv 갱신
 PY
 # ② Fed 계단 + 매일 News → 일별 결합(headline)
