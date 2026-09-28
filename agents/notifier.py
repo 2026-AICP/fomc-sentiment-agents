@@ -159,14 +159,20 @@ def decide_correction(date, grade, grade_final, today, sent=()) -> Optional[Deci
 _NUMERIC_PAREN = re.compile(r"\s*\([^)]*\d[^)]*\)")
 
 
-def decide_fed_meeting(date, today, grade="", sent=(), signal_sends=False) -> Decision:
+def decide_fed_meeting(date, today, grade="", sent=(), signal_sends=False,
+                       details=None, confidence=None) -> Decision:
     """§2-2 FOMC 회의일 알림 — 성명문·기자회견을 한 통으로.
 
     같은 날 같은 회의에 메일이 두 통 가지 않게 한다(조교 피드백 2026-09-10).
     그날 🔴 신호 메일이 나가면 일정은 그 메일에 합치고(merged), 신호가 조용하면
     일정 알림이 따로 1통 나간다. 등급·게이트·휴장은 보지 않는다 — 일정 통보라서다.
+
+    details·confidence 는 그날 신호 판정에서 그대로 받아 본문에 싣는다(§5 포함 항목).
+    등급만 있으면 "왜 그 등급인지"가 메일에 없어 사이트를 열어야만 알 수 있었다.
+    숫자는 render 가 strip_measurements 로 걷어낸다 — §5 제외 항목 그대로다.
     """
-    d = Decision(date=date, kind="fed_meeting", grade=grade, fired=[], send=False)
+    d = Decision(date=date, kind="fed_meeting", grade=grade, fired=[], send=False,
+                 details=list(details or []), confidence=confidence)
     if date != today:                              # 회의록 재방문 실행 등
         d.suppressed = SUP_NOT_TODAY
     elif (date, "fed_meeting") in sent or (date, "signal") in sent:
@@ -214,10 +220,14 @@ def render(d: Decision, footer: Optional[str] = None) -> tuple:
     if d.kind == "fed_meeting":
         subject = f"[FOMC] {d.date} 결과 발표"
         lines = [f"오늘은 FOMC 결과 발표일입니다 (성명문 · 기자회견).",
-                 f"오늘의 신호: {d.grade}" if d.grade else "오늘의 신호: 산출 전",
-                 "",
-                 "회의록은 약 3주 뒤 공개되며, 그때 확정판 등급을 다시 알립니다.",
-                 PROVISIONAL]
+                 f"오늘의 신호: {d.grade}" if d.grade else "오늘의 신호: 산출 전"]
+        if d.details:                       # 발동한 신호가 있으면 이유 한 줄 (숫자 제거)
+            lines.append(" · ".join(strip_measurements(x) for x in d.details))
+        if d.confidence:                    # 그날 뉴스 표본의 신뢰도
+            lines.append(f"신뢰도 {d.confidence}")
+        lines += ["",
+                  "회의록은 약 3주 뒤 공개되며, 그때 확정판 등급을 다시 알립니다.",
+                  PROVISIONAL]
     elif d.kind == "fed_minutes":
         subject = f"[FOMC] {d.date} 회의 회의록 반영"
         lines = [f"{d.date} FOMC 회의록이 공개되었습니다.",

@@ -478,8 +478,10 @@ def notifier_node(state: State) -> State:
     # §2-2 FOMC 회의일 — 신호 메일과 같은 날이면 한 통으로 합친다.
     fm = None
     if state["statement_path"]:
+        # 이유·신뢰도는 같은 날 신호 판정에서 그대로 받는다 — 두 메일이 다른 말을 하지 않는다.
         fm = nt.decide_fed_meeting(state["date"], today, grade=d.grade, sent=sent,
-                                   signal_sends=d.send)
+                                   signal_sends=d.send,
+                                   details=d.details, confidence=d.confidence)
         if fm.suppressed == nt.SUP_MERGED:
             d.fed_event = "meeting"
 

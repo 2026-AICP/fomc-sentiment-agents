@@ -285,3 +285,22 @@ def test_read_sent_skips_send_failed(tmp_path):
     append_log(d, path=p, channel=CHANNEL_EMAIL, n_recipients=2, n_failed=2)
     assert SUP_SEND_FAILED == "send_failed"
     assert read_sent(p) == set()
+
+
+# --- §2-2 회의일 메일에 발동 규칙·신뢰도 추가 (2026-09-28) -----------------------
+def test_fed_meeting_mail_shows_fired_reason_and_confidence():
+    """회의일 메일도 등급만이 아니라 '왜'와 신뢰도를 담는다 — §5 포함 항목 그대로."""
+    d = decide_fed_meeting(TODAY, TODAY, grade=GRADE_CAUTION,
+                           details=["🔽 톤 악화 (-1.024)"], confidence="높음")
+    _, body = render(d)
+    assert "🔽 톤 악화" in body
+    assert "(-1.024)" not in body            # §5 — 숫자는 사이트에서만
+    assert "신뢰도 높음" in body
+
+
+def test_fed_meeting_mail_without_details_stays_short():
+    """산출 전이거나 발동이 없으면 예전처럼 짧게 — 빈 줄만 늘리지 않는다."""
+    d = decide_fed_meeting(TODAY, TODAY, grade=GRADE_NEUTRAL)
+    _, body = render(d)
+    assert "신뢰도" not in body
+    assert body.count("\n\n") == 2           # 본문 1블록 + 푸터 앞 빈 줄
