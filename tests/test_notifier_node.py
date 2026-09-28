@@ -246,3 +246,14 @@ def test_zero_recipients_is_send_failed(tmp_path, monkeypatch):
                         lambda d: ("email", 0, 0, ["구독자 조회 실패: HTTP 500"]))
     graph.notifier_node(_state("2026-08-20", GRADE_ALERT, ["divergence"]))
     assert _rows(p)[0]["suppressed_reason"] == nt.SUP_SEND_FAILED
+
+
+def test_fed_meeting_mail_carries_signal_reason(tmp_path, monkeypatch):
+    """회의일 메일 본문에 그날 발동 규칙과 신뢰도가 실린다 (2026-09-28)."""
+    _today(monkeypatch, tmp_path, "2026-09-16")
+    sent = []
+    monkeypatch.setattr(nt, "render", lambda d, footer=None: ("s", "b") if sent.append(d) else ("s", "b"))
+    graph.notifier_node(_state("2026-09-16", GRADE_CAUTION, ["tone_shift"], statement="x"))
+    fm = [d for d in sent if d.kind == "fed_meeting"][0]
+    assert fm.details and "괴리" in " ".join(fm.details)
+    assert fm.confidence == "높음"          # 픽스처: 기사 40건 · CI 폭 0.30
