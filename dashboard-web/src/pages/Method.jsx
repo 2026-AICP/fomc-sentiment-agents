@@ -17,7 +17,7 @@ export default function Method() {
 
       <h2 className="sec">1. 왜 연준 문서와 뉴스를 함께 보나요?</h2>
       <div className="kpis">
-        <Kpi eyebrow="연준 문서만" value={v.r_fed}
+        <Kpi eyebrow="연준 문서만 (3종 결합)" value={v.r_fed}
           meta={`VIX와의 상관계수 · ${v.n_months}개월`} />
         <Kpi eyebrow="뉴스만" value={v.r_news}
           meta="월스트리트저널 기사 38,869건" />
@@ -36,7 +36,7 @@ export default function Method() {
           앞 기간의 자료로 기준을 정한 뒤, 보지 않은 뒤 기간에서 다시 측정해도 상관이
           유지됩니다.
           {v.holdout.map((h) => (
-            <div key={h.split} className="cap">{h.split}년 이후 자료에서 다시 측정한 값 <b className="num">{h.out}</b></div>
+            <div key={h.split} className="cap">{h.split}년 이후 자료에서 다시 측정한 값 <b className="num">{Number(h.out).toFixed(3)}</b></div>
           ))}
         </Panel>
         <Panel title="무작위로 다시 뽑아 확인했습니다">
