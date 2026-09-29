@@ -5,9 +5,6 @@ import { IndexArea, SimpleLine, DualLine } from "../components/charts";
 export default function Market() {
   const { data: market } = useJson("market");
   const { data: vs } = useJson("sentiment_vs_market");
-  const { data: meta } = useJson("meta");
-  // 공식 상관계수는 최종보고서 확정값(meta). 시리즈 재계산값(vs.r)은 데이터 시점에 따라 조금 다를 수 있다.
-  const r = meta?.validation?.r_combined ?? vs?.r;
   if (!market) return <div className="loading">데이터를 불러오는 중입니다.</div>;
   if (!market.length) return <div className="loading">아직 수집된 시장 데이터가 없습니다.</div>;
 
@@ -35,10 +32,10 @@ export default function Market() {
 
       <h2 className="sec">감성지수와 VIX</h2>
       {vs?.series ? (
-        <Panel cap={`주황 선은 통합 감성지수, 파랑 선은 VIX입니다. 감성이 낮아질 때 변동성이 오르는 반대 방향의 관계가 나타나며, ${vs.n_months}개월 동안의 상관계수는 ${r}입니다. 검증 과정은 방법론 페이지에서 설명합니다.`}>
+        <Panel cap={`주황 선은 통합 감성지수, 파랑 선은 VIX입니다. 감성이 낮아질 때 변동성이 오르는 반대 방향의 관계가 나타나며, ${vs.n_months}개월 동안의 상관계수는 ${vs.r}입니다. 검증 과정은 방법론 페이지에서 설명합니다.`}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
           <b>통합 감성지수와 VIX (월별)</b>
-          <span className="pill" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)", fontSize: 13 }}>상관계수 {r}</span>
+          <span className="pill" style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)", fontSize: 13 }}>상관계수 {vs.r}</span>
         </div>
         <DualLine data={vs.series}
           left={{ key: "combined", name: "통합 감성지수", color: "var(--accent)" }}

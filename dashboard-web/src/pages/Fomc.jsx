@@ -51,19 +51,18 @@ function AllDocs() {
 
       <h2 className="sec">문서별 평균 톤</h2>
       <div className="kpis">
-        <Kpi eyebrow="성명문" value={<span style={{ color: C.statement }}>{fmt(avg.statement ?? 0.145)}</span>}
+        <Kpi eyebrow="성명문" value={<span style={{ color: C.statement }}>{fmt(avg.statement ?? 0.185)}</span>}
           meta="공식 발표문 — 가장 낙관적" />
-        <Kpi eyebrow="회의록" value={<span style={{ color: C.minutes }}>{fmt(avg.minutes ?? 0.081)}</span>}
+        <Kpi eyebrow="회의록" value={<span style={{ color: C.minutes }}>{fmt(avg.minutes ?? 0.088)}</span>}
           meta="내부 논의 기록" />
-        <Kpi eyebrow="기자회견" value={<span style={{ color: C.presser }}>{fmt(avg.presser ?? 0.057)}</span>}
+        <Kpi eyebrow="기자회견" value={<span style={{ color: C.presser }}>{fmt(avg.presser ?? 0.056)}</span>}
           meta="즉석 질의응답 — 가장 신중" />
       </div>
 
       <div className="note" style={{ lineHeight: 1.8 }}>
         <b>공식 문서일수록 어조가 낙관적입니다.</b> 다듬어진 발표문(성명문)이 가장 높고,
-        내부 논의(회의록), 즉석 답변(기자회견) 순으로 낮아집니다. 전체 회의의 72.5%에서
-        성명문 어조가 낙관(양수)이라 0이 중립이 아닙니다. 그렇다고 둔감한 것은 아니어서,
-        2008년에는 성명문 10건 중 7건, 2020년에는 10건 중 6건이 음수였습니다. 그래서
+        내부 논의(회의록), 즉석 답변(기자회견) 순으로 낮아집니다. 전체 회의의 약 72%에서
+        성명문 어조가 낙관(양수)이고 2008·2020년 위기 성명문조차 양수였습니다 — 그래서
         각 문서의 톤은 절대값이 아니라 <b>그 문서의 평소 수준 대비</b>로 읽으며, 통합지수도
         문서별로 표준화한 뒤 같은 비중(1:1:1)으로 합칩니다.
         {corr.stmt_minutes != null && (
