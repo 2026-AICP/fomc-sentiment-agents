@@ -17,7 +17,7 @@ export default function Method() {
 
       <h2 className="sec">1. 왜 연준 문서와 뉴스를 함께 보나요?</h2>
       <div className="kpis">
-        <Kpi eyebrow="연준 문서만" value={v.r_fed}
+        <Kpi eyebrow="연준 문서만 (3종 결합)" value={v.r_fed}
           meta={`VIX와의 상관계수 · ${v.n_months}개월`} />
         <Kpi eyebrow="뉴스만" value={v.r_news}
           meta="월스트리트저널 기사 38,869건" />
