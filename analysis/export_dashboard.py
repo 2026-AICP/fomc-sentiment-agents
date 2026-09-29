@@ -4,7 +4,7 @@ React/Lovable 등 웹 프론트는 파이썬을 못 돌리므로, DB·CSV의 분
 정적 JSON으로 변환한다. 프론트는 이 파일들만 fetch해서 렌더(계산 없음 — 환각 차단).
 
 산출 (기본 outputs/dashboard/):
-  meta.json           생성시각·기간·건수 + 검증 수치(-0.524, 홀드아웃, CI, LOMO, 괴리 2.4x, presser 87%)
+  meta.json           생성시각·기간·건수 + 검증 수치(보고서 확정값 -0.605, 홀드아웃, CI, LOMO, 괴리 2.4x)
   meetings.json       회의별 Fed 톤 (conf_weighted, confidence)
   alerts.json         회의별 신호 (등급·발동·톤·시장반응) — 검증된 signals 엔진 재사용
   news_daily.json     일별 News 지수 (+ 부트스트랩 CI, 기사수)
@@ -258,29 +258,38 @@ def export_meta(con, counts):
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "counts": counts,
         "axis_corr": export_axis_corr(),
-        "validation": {                       # build_headline_norm / validate_robustness
-            **norm.get("validation", {}),
-            "bootstrap_ci": [-0.634, -0.426],
-            "holdout": [{"split": 2012, "out": -0.479}, {"split": 2014, "out": -0.509},
-                        {"split": 2016, "out": -0.528}],
-            "lomo_range": [-0.543, -0.526],
+        # ↓ 최종보고서(2026-09) 확정값. 현재 설계(연준 3문서 1:1:1 → 뉴스와 1:1) 기준이다.
+        #   이전 값(-0.524 등)은 연준 축이 성명문 하나이던 설계의 검증이라, 사이트가 실제로
+        #   내보내는 지수와 달랐다. 보고서·포스터·공모전 서류와 같은 숫자를 쓴다.
+        #   부호: 감성이 낙관적일수록 VIX 가 낮다(음의 상관). 보고서는 크기로 적었다.
+        "validation": {
+            "period": "2000-02-01~2021-05-01", "n_months": 256,
+            "r_fed": -0.577,                  # 연준 3문서(1:1:1) 단독 — 성명문 단독 -0.418
+            "r_news": -0.385,                 # 뉴스 단독(WSJ 백본)
+            "r_combined": -0.605,             # 통합(현재 설계)
+            "r_statement_design": -0.435,     # 대체된 설계(성명문 단독) — 보고서 Fig 4
+            "bootstrap_ci": [-0.687, -0.507],
+            "holdout": [{"split": 2012, "out": -0.498}, {"split": 2014, "out": -0.530},
+                        {"split": 2016, "out": -0.607}],
+            "lomo_range": [-0.613, -0.596],
         },
         "divergence": {                       # validate_divergence (docs/news_fed_index.md §5)
             "rate_normal": 0.18, "rate_crisis": 0.42, "ratio": 2.4,
             "p_permutation": 0.001, "p_fisher": 0.0008,
             "note": "위기 예측이 아닌 attention signal — 추가 검토 필요 표시",
         },
-        # ↓ 세 축 모두 **원본 FinBERT(T=1)** 로 재점수화한 값 (2026-08 기준).
-        #   이전 수치는 성명문만 T=3.1 시절 DB 값이라 축 간 스케일이 섞여 있었다.
+        # ↓ 최종보고서(2026-09) 확정값 — 성명문 평균은 전체 회의 기준이다.
+        #   이전 0.185 는 기자회견이 있는 93회의에서만 낸 성명문 평균이라 기준이 섞여 있었다.
         "presser_finding": {                  # analysis/presser_backfill
-            "n_meetings": 93, "pct_more_cautious": 0.73, "mean_gap": -0.1303,
+            "n_meetings": 94, "pct_more_cautious": 69 / 94, "mean_gap": -0.134,
             "p_sign_test": 9.4e-06,
             "note": "기자회견 톤이 성명문보다 일관되게 신중 (2011~2026, 4의장)",
         },
         "minutes_finding": {                  # analysis/minutes_backfill
-            "n_meetings": 214, "pct_more_cautious": 0.68, "mean_gap": -0.0692,
+            "n_meetings": 215, "pct_more_cautious": 147 / 215, "mean_gap": -0.0692,
             "p_sign_test": 1.0e-07,
-            "axis_means": {"statement": 0.185, "minutes": 0.088, "presser": 0.056},
+            "axis_means": {"statement": 0.145, "minutes": 0.081, "presser": 0.057},
+            "positive_share_statement": 0.725,
             "axis_corr": {"stmt_minutes": 0.67, "stmt_presser": 0.34, "minutes_presser": 0.49},
             "note": "공식 문서일수록 낙관적(성명문>회의록>기자회견). 축 상관 0.34~0.67 = "
                     "서로 다른 정보 → 축별 분리 분석의 근거",
@@ -293,7 +302,7 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB)
 
-    vs = ROOT / "analysis" / "validation_series.json"    # 감성↔시장 월별(-0.524 원본, 커밋본)
+    vs = ROOT / "analysis" / "validation_series.json"    # 감성↔시장 월별(현재 설계, 커밋본)
     files = {
         "sentiment_vs_market.json": json.loads(vs.read_text(encoding="utf-8")) if vs.exists() else {},
         "meetings.json": export_meetings(con),
