@@ -48,11 +48,12 @@ SUP_SEND_FAILED = "send_failed"          # 발송 시도했으나 한 명도 못
 LEVEL_ALERT = "alert"        # 🔴 만
 LEVEL_CAUTION = "caution"    # ⚠️ 이상
 
-# data.js 의 confidenceLevel() 과 같은 규칙이어야 한다(§5). 게이트 임계값(15건·0.60)은
+# data.js 의 confidenceLevel() 과 같은 규칙이어야 한다(§5). 게이트 임계값(15건·엇갈림 0.72)은
 # news_signals 에서 가져오고, '높음' 조건만 여기 상수로 둔다 — 두 구현이 어긋나면
 # tests/test_notifier.py 가 깨진다.
 HIGH_MIN_ARTICLES = 30
-HIGH_MAX_CI_WIDTH = 0.40
+HIGH_MAX_SD = 0.64           # '높음' = 엇갈림이 평소(실운영 15건 이상 일의 sd 중앙값 0.641) 이하
+HIGH_MAX_CI_WIDTH = 0.40     # score_sd 없는 옛 행에만
 
 DISCLAIMER = "참고용이며 투자조언이 아닙니다."
 PROVISIONAL = "회의록 반영 전 잠정치입니다."
@@ -79,9 +80,16 @@ class Decision:
     fed_event: Optional[str] = None    # 이 메일에 합쳐진 Fed 일정 — "meeting" / "minutes"
 
 
-def confidence_label(n_articles, ci_lo, ci_hi) -> str:
-    """신뢰도 높음/보통/낮음 — dashboard-web/src/lib/data.js 의 confidenceLevel() 과 동일."""
+def confidence_label(n_articles, ci_lo, ci_hi, score_sd=None) -> str:
+    """신뢰도 높음/보통/낮음 — dashboard-web/src/lib/data.js 의 confidenceLevel() 과 동일.
+
+    엇갈림은 score_sd(기사 간 어조 표준편차)로 본다. 없으면(옛 행) CI 폭 규칙.
+    """
     n = n_articles or 0
+    if score_sd is not None and score_sd == score_sd:
+        if n < NEWS_TH.min_articles or score_sd > NEWS_TH.sd_max:
+            return "낮음"
+        return "높음" if n >= HIGH_MIN_ARTICLES and score_sd <= HIGH_MAX_SD else "보통"
     width = (ci_hi - ci_lo) if (ci_lo is not None and ci_hi is not None) else None
     if n < NEWS_TH.min_articles or (width is not None and width > NEWS_TH.ci_max):
         return "낮음"
@@ -92,11 +100,11 @@ def confidence_label(n_articles, ci_lo, ci_hi) -> str:
 
 def decide(date, grade, fired, n_articles, ci_lo, ci_hi, today,
            level=LEVEL_ALERT, sent=(), details=None, news_only=False,
-           has_market=True) -> Decision:
+           has_market=True, score_sd=None) -> Decision:
     """일별 신호 알림을 보낼지. 순수 함수 — sent 는 이미 발송된 (date, kind) 집합."""
     d = Decision(date=date, kind="signal", grade=grade, fired=list(fired or []),
                  send=False, details=list(details or []),
-                 confidence=confidence_label(n_articles, ci_lo, ci_hi),
+                 confidence=confidence_label(n_articles, ci_lo, ci_hi, score_sd),
                  news_only=news_only)
 
     if date != today:                              # §4 소급 발송 금지

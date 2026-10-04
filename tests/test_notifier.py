@@ -171,6 +171,15 @@ def test_confidence_boundary_at_gate():
     assert confidence_label(15, -0.3, 0.3) == "보통"        # 정확히 15건 · 폭 0.60
 
 
+def test_confidence_uses_sd_when_present():
+    """2026-10-04: 엇갈림은 score_sd 로 본다 — CI 폭이 넓어도 sd 가 평소 수준이면 보통."""
+    assert confidence_label(20, -0.35, 0.30, 0.65) == "보통"   # 폭 0.65 지만 sd 0.65
+    assert confidence_label(20, -0.1, 0.1, 0.80) == "낮음"     # sd > 0.72
+    assert confidence_label(14, -0.1, 0.1, 0.30) == "낮음"     # 기사 하한
+    assert confidence_label(30, -0.4, 0.4, 0.60) == "높음"     # 30건 · sd ≤ 0.64
+    assert confidence_label(30, -0.1, 0.1, 0.66) == "보통"
+
+
 # --- §5 내용 규격 -----------------------------------------------------------
 def test_subject_carries_grade():
     subject, _ = render(decide(TODAY, GRADE_ALERT, ["divergence"], **OK))

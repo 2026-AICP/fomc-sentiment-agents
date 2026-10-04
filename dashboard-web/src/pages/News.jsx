@@ -32,7 +32,7 @@ export default function News() {
           </thead>
           <tbody>
             {visible.map((r) => {
-              const c = confidenceLevel(r.n_articles, r.ci_lo, r.ci_hi);
+              const c = confidenceLevel(r.n_articles, r.ci_lo, r.ci_hi, r.score_sd);
               return (
                 <tr key={r.date}>
                   <td>{r.date}</td>

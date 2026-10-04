@@ -77,7 +77,7 @@ export default function Home() {
   const lastMeet = meetings[meetings.length - 1];
   const lastMn = minutes?.find((r) => r.date === lastMeet.date);
   const lastPr = presser?.find((r) => r.date === lastMeet.date);
-  const conf = confidenceLevel(ds.n_articles, ds.ci_lo, ds.ci_hi);
+  const conf = confidenceLevel(ds.n_articles, ds.ci_lo, ds.ci_hi, ds.score_sd);
 
   const recent = (key) => {
     const out = [];

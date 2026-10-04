@@ -41,3 +41,25 @@ def test_ci_absent_falls_back_to_article_count():
     남아 있어야 게이트가 뚫리지 않는다."""
     assert confident(DEFAULT.min_articles, float("nan"), float("nan"))[0]
     assert not confident(DEFAULT.min_articles - 1, float("nan"), float("nan"))[0]
+
+
+# --- 2026-10-04: 엇갈림은 기사 간 어조 표준편차(score_sd)로 판정 ---------------------
+def test_dispersion_rule_ignores_ci_width_when_sd_present():
+    """기사 20건·어조 엇갈림 평소 수준(0.65)이면, CI 폭이 0.60 을 넘어도 통과한다.
+    CI 폭은 기사 수에 따라 줄어 '기사 수'를 두 번 따지게 되므로 sd 가 있으면 쓰지 않는다."""
+    ok, why = confident(20, -0.35, 0.30, score_sd=0.65)     # 폭 0.65 > ci_max
+    assert ok and why == ""
+
+
+def test_dispersion_rule_blocks_real_disagreement():
+    ok, why = confident(60, -0.07, 0.26, score_sd=DEFAULT.sd_max + 0.01)
+    assert not ok and "엇갈림" in why
+
+
+def test_dispersion_rule_still_needs_article_floor():
+    ok, why = confident(DEFAULT.min_articles - 1, None, None, score_sd=0.3)
+    assert not ok and "건" in why
+
+
+def test_nan_sd_falls_back_to_ci_rule():
+    assert not confident(60, -0.5, 0.5, score_sd=float("nan"))[0]

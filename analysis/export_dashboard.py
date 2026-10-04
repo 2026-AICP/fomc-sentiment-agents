@@ -68,7 +68,8 @@ def export_alerts(con):
 def export_news_daily():
     return [{"date": r["date"], "n_articles": int(r["n_articles"]),
              "index": _f(r["conf_weighted"]), "ci_lo": _f(r["ci_lo"]),
-             "ci_hi": _f(r["ci_hi"]), "confidence": _f(r["confidence"], 3)}
+             "ci_hi": _f(r["ci_hi"]), "confidence": _f(r["confidence"], 3),
+             "score_sd": _f(r.get("score_sd")) if r.get("score_sd") else None}
             for r in _csv_rows(ROOT / "outputs" / "news_index_live.csv")]
 
 
@@ -110,6 +111,7 @@ def export_daily_signals():
              "gate_reason": r.get("gate_reason") or None,
              "n_articles": int(r["n_articles"]) if r.get("n_articles") else None,
              "ci_lo": _f(r.get("ci_lo")), "ci_hi": _f(r.get("ci_hi")),
+             "score_sd": _f(r.get("score_sd")) if r.get("score_sd") else None,
              "fed_axes": [x for x in (r.get("fed_axes") or "").split(";") if x],
              "grade_final": r.get("grade_final") or None,
              "index_final": _f(r.get("index_final")),

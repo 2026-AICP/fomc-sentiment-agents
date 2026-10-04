@@ -309,7 +309,8 @@ def strategy_node(state: State) -> State:
     gate_reason = None
     news = state.get("news")
     if news and g in (GRADE_CAUTION, GRADE_ALERT):
-        ok, reason = news_confident(news["n_articles"], news.get("ci_lo"), news.get("ci_hi"))
+        ok, reason = news_confident(news["n_articles"], news.get("ci_lo"), news.get("ci_hi"),
+                                    score_sd=news.get("score_sd"))
         if not ok:
             gate_reason = reason
             g = GRADE_WATCH
@@ -318,7 +319,8 @@ def strategy_node(state: State) -> State:
                         "details": [s.detail for s in sigs if s.fired],
                         "n_articles": news.get("n_articles") if news else None,
                         "ci_lo": news.get("ci_lo") if news else None,
-                        "ci_hi": news.get("ci_hi") if news else None}
+                        "ci_hi": news.get("ci_hi") if news else None,
+                        "score_sd": news.get("score_sd") if news else None}
     tstr = f"{tone:+.3f}" if tone is not None else "—"
     gate_str = f" (게이트: {gate_reason})" if gate_reason else ""
     state["log"].append(f"[strategy] 등급 {g}{gate_str} (결합톤 {tstr}) | 발동 {fired or '없음'}")
@@ -327,7 +329,8 @@ def strategy_node(state: State) -> State:
 
 # ── ⑤ Reporting ──
 DAILY_FIELDS = ["date", "grade", "index", "fired", "gate_reason", "n_articles", "ci_lo", "ci_hi",
-                "fed_axes", "grade_final", "index_final", "fed_axes_final", "finalized_at"]
+                "fed_axes", "grade_final", "index_final", "fed_axes_final", "finalized_at",
+                "score_sd"]   # score_sd: 2026-10-04 추가 — 그 전 행은 빈칸(신뢰도는 옛 규칙으로 표시)
 
 
 def append_daily_signal(rec: dict, out=None):
@@ -358,6 +361,7 @@ def append_daily_signal(rec: dict, out=None):
               "n_articles": rec.get("n_articles") if rec.get("n_articles") is not None else "",
               "ci_lo": rec.get("ci_lo") if rec.get("ci_lo") is not None else "",
               "ci_hi": rec.get("ci_hi") if rec.get("ci_hi") is not None else "",
+              "score_sd": rec.get("score_sd") if rec.get("score_sd") is not None else "",
               "fed_axes": ";".join(rec.get("fed_axes") or []),
               "grade_final": "", "index_final": "", "fed_axes_final": "", "finalized_at": ""}
     else:
@@ -472,6 +476,7 @@ def notifier_node(state: State) -> State:
     d = nt.decide(state["date"], sig.get("grade", "—"), sig.get("fired") or [],
                   sig.get("n_articles"), sig.get("ci_lo"), sig.get("ci_hi"),
                   today=today, sent=sent, details=sig.get("details"),
+                  score_sd=sig.get("score_sd"),
                   news_only=not state["statement_path"],
                   has_market=bool(state.get("market")))
 
@@ -538,6 +543,7 @@ def reporting_node(state: State) -> State:
                          "gate_reason": sig.get("gate_reason"),
                          "n_articles": sig.get("n_articles"),
                          "ci_lo": sig.get("ci_lo"), "ci_hi": sig.get("ci_hi"),
+                         "score_sd": sig.get("score_sd"),
                          "fed_axes": state.get("fed_axes"),
                          "is_final": bool(state.get("fed_final"))})
     # ★시점 기록 — 위 CSV는 그 날짜의 '현재 상태'를 담지만, 이 로그는 덧붙이기만 한다.

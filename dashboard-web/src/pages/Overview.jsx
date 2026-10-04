@@ -50,6 +50,10 @@ export default function Overview() {
           value={<>{fmt(lastNews?.index)}<span className="unit">원점수</span></>}
           meta={lastNews
             ? `${lastNews.date} · 기사 ${lastNews.n_articles}건${newsLabel ? ` · ${newsLabel.text}` : ""}`
+              // 통합 칸의 '뉴스' 값은 이 원점수를 표준화한 값이다(척도가 달라 다른 숫자로 보였다,
+              // 2026-10-04 지적). 같은 날이면 표준화 값을 함께 적어 두 칸을 잇는다.
+              + (lastCombined?.news_z != null && lastCombined.date === lastNews.date
+                ? ` · 표준화 ${fmt(lastCombined.news_z)}` : "")
             : "수집 전"} />
         <Kpi eyebrow="최근 회의 신호"
           value={<span style={{ fontSize: 22, color: g.color }}>{g.label}</span>}
