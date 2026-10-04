@@ -44,14 +44,27 @@ export const gradeInfo = (g) => {
   return { label, color: GRADE_COLOR[g] || "var(--muted)" };
 };
 
-// 신뢰도 등급 — 기사 수와 신뢰구간 폭으로 판정.
+// 신뢰도 등급 — 기사 수와 기사 간 어조 엇갈림(score_sd)으로 판정.
 // ★'낮음'의 조건은 신호 게이트(analysis/news_signals.confident: 기사 15건 하한,
-//   CI 폭 0.60 상한)와 **같은 규칙**이다. 화면의 '낮음'과 신호의 '관망'이 어긋나면
+//   어조 엇갈림 0.72 상한)와 **같은 규칙**이다. 화면의 '낮음'과 신호의 '관망'이 어긋나면
 //   같은 날을 두고 사이트와 경보가 다른 말을 하게 되므로 한 기준으로 묶는다.
-const MIN_ARTICLES = 15, CI_MAX = 0.60;
+//   (2026-10-04) 예전 'CI 폭 0.60'은 기사 수에 따라 줄어드는 값이라 사실상 기사 수를 두 번
+//   따졌다. score_sd 가 없는 옛 행(백필 주별 등)만 CI 폭 규칙으로 본다.
+const MIN_ARTICLES = 15, CI_MAX = 0.60, SD_MAX = 0.72, HIGH_SD = 0.64;
 
-export const confidenceLevel = (nArticles, ciLo, ciHi) => {
+export const confidenceLevel = (nArticles, ciLo, ciHi, scoreSd) => {
   const n = Number(nArticles) || 0;
+  const sd = scoreSd != null && !Number.isNaN(Number(scoreSd)) ? Number(scoreSd) : null;
+  if (sd != null) {
+    if (n < MIN_ARTICLES || sd > SD_MAX) {
+      return { label: "낮음", color: "var(--warn)",
+        why: n < MIN_ARTICLES ? `기사 ${n}건으로 적습니다` : "기사 간 어조가 평소보다 크게 엇갈립니다" };
+    }
+    if (n >= 30 && sd <= HIGH_SD) {
+      return { label: "높음", color: "var(--up)", why: "기사가 많고 어조가 일관됩니다" };
+    }
+    return { label: "보통", color: "var(--muted)", why: "판단에 무리는 없는 수준입니다" };
+  }
   const width = (ciLo != null && ciHi != null && !Number.isNaN(ciLo) && !Number.isNaN(ciHi))
     ? ciHi - ciLo : null;
   if (n < MIN_ARTICLES || (width != null && width > CI_MAX)) {

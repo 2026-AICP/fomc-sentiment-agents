@@ -15,7 +15,7 @@ analysis/news_index.py(과거 WSJ·월별, 검증용)와 **방법론을 공유**
 
 산출: outputs/news_index_live.csv
       (date, n_articles, mean_score, share_pos_minus_neg, conf_weighted,
-       ci_lo, ci_hi, confidence)
+       ci_lo, ci_hi, confidence, score_sd)
 
 실행:  python3 analysis/news_index_live.py                 # 기본 CSV
        python3 analysis/news_index_live.py <fed_news.csv>  # 경로 지정
@@ -57,6 +57,23 @@ def _weighted(scores, weights):
     s, w = np.asarray(scores, float), np.asarray(weights, float)
     denom = w.sum()
     return float((s * w).sum() / denom) if denom > 1e-9 else float(s.mean())
+
+
+def _weighted_sd(scores, weights):
+    """기사 간 어조 엇갈림 — 확신도 가중 표준편차 (n<2 → NaN).
+
+    신뢰구간 폭은 '어조 엇갈림'과 '기사 수'가 섞인 값이라(폭 ≈ 2·1.96·sd/√n),
+    기사 수 하한과 함께 쓰면 기사 수를 두 번 따지게 된다. 신뢰도 게이트의
+    '엇갈림' 조건은 이 값으로 판정한다(news_signals.Thresholds.sd_max).
+    """
+    import numpy as np
+    s, w = np.asarray(scores, float), np.asarray(weights, float)
+    if len(s) < 2:
+        return NAN
+    if w.sum() <= 1e-9:
+        return float(s.std())
+    m = (s * w).sum() / w.sum()
+    return float(np.sqrt((w * (s - m) ** 2).sum() / w.sum()))
 
 
 def _boot_ci(scores, weights, B=2000, level=95, seed=0):
@@ -120,6 +137,7 @@ def aggregate_daily(art):
             "conf_weighted": _weighted(s, w),
             "ci_lo": lo, "ci_hi": hi,
             "confidence": float(w.mean()),
+            "score_sd": _weighted_sd(s, w),
         })
     return pd.DataFrame(rows)
 
@@ -147,7 +165,8 @@ def _score_window(df):
     s, w = art["score"].to_numpy(), art["w"].to_numpy()
     lo_ci, hi_ci = _boot_ci(s, w)
     return {"conf_weighted": _weighted(s, w), "ci_lo": lo_ci,
-            "ci_hi": hi_ci, "n_articles": int(len(art))}
+            "ci_hi": hi_ci, "n_articles": int(len(art)),
+            "score_sd": _weighted_sd(s, w)}
 
 
 def index_for_window(csv_path=IN, center=None, before=3, after=1):

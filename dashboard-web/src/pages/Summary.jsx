@@ -107,7 +107,7 @@ export default function Summary() {
   ];
 
   const lastLabel = toneLabel(last.index);
-  const conf = confidenceLevel(lastNews.n_articles, lastNews.ci_lo, lastNews.ci_hi);
+  const conf = confidenceLevel(lastNews.n_articles, lastNews.ci_lo, lastNews.ci_hi, lastNews.score_sd);
 
   return (
     <>

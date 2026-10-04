@@ -36,7 +36,13 @@ class Thresholds:
     theta_sign: float = 0.05      # 부호전환: 양쪽 크기 하한
     extreme_window: int = 10      # 극단값: 최근 N일 창
     min_articles: int = 15        # 신뢰도 게이트: 기사 하한
-    ci_max: float = 0.60          # 신뢰도 게이트: CI 폭 상한
+    ci_max: float = 0.60          # 신뢰도 게이트: CI 폭 상한 — score_sd 가 없는 옛 행에만 쓴다
+    # 신뢰도 게이트: 기사 간 어조 표준편차 상한 (2026-10-04 확정, 사용자 결정).
+    #   CI 폭은 기사 수에 따라 줄어서(폭 ≈ 2·1.96·sd/√n) 0.60 상한이 사실상 '기사 약 21건
+    #   미만'과 같은 조건이었다 — 기사 수를 두 번 따진 셈. 엇갈림은 기사 수와 무관한 sd 로 본다.
+    #   값: 실운영 2026-07-10~10-03 중 기사 15건 이상인 53일의 일별 sd 90분위(0.718).
+    #   이날부터 적용 — 이미 기록된 일별 신호(daily_signals.csv)는 다시 쓰지 않는다.
+    sd_max: float = 0.72
     theta_div_news: float = 0.05  # 괴리: 뉴스 감성 크기 하한
     theta_div_mkt: float = 0.5    # 괴리: 시장 변동 크기 하한 (% 단위)
 
@@ -113,11 +119,20 @@ def signal_divergence(news: float, market_ret, th: Thresholds = DEFAULT) -> Sign
     return Signal("divergence", False, "괴리 아님")
 
 
-def confident(n_articles: int, ci_lo, ci_hi, th: Thresholds = DEFAULT):
-    """신뢰도 게이트: 기사 충분 + CI 충분히 좁으면 (True, '')."""
+def confident(n_articles: int, ci_lo, ci_hi, th: Thresholds = DEFAULT, score_sd=None):
+    """신뢰도 게이트: 기사 충분 + 기사 간 어조가 크게 엇갈리지 않으면 (True, '').
+
+    엇갈림은 score_sd(기사 간 어조 표준편차)로 판정한다. score_sd 가 없는 옛 행(백필 주별 등)만
+    예전 규칙(CI 폭)으로 본다.
+    """
     if n_articles < th.min_articles:
         return False, f"기사 {n_articles}건(<{th.min_articles}) — 관망(신뢰도 부족)"
-    if ci_lo == ci_lo and ci_hi == ci_hi and (ci_hi - ci_lo) > th.ci_max:
+    if score_sd is not None and score_sd == score_sd:
+        if score_sd > th.sd_max:
+            return False, f"기사 간 어조 엇갈림 {score_sd:.2f}(>{th.sd_max}) — 관망(신뢰도 부족)"
+        return True, ""
+    if ci_lo is not None and ci_hi is not None and ci_lo == ci_lo and ci_hi == ci_hi \
+            and (ci_hi - ci_lo) > th.ci_max:
         return False, f"CI 폭 {ci_hi - ci_lo:.2f} 넓음 — 관망(신뢰도 부족)"
     return True, ""
 
@@ -139,7 +154,8 @@ def build_alerts(series: List[dict], market: dict = None, th: Thresholds = DEFAU
             signal_sign_flip(prev, today, th.theta_sign),
             signal_divergence(today, mret, th),
         ]
-        ok, gate = confident(row["n_articles"], row.get("ci_lo"), row.get("ci_hi"), th)
+        ok, gate = confident(row["n_articles"], row.get("ci_lo"), row.get("ci_hi"), th,
+                             score_sd=row.get("score_sd"))
         fired = [s for s in sigs if s.fired]
         if not ok:
             level = "⚪ 관망"
