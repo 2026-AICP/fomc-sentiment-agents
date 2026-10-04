@@ -82,14 +82,27 @@ export default function News() {
 
       <h2 className="sec">신뢰도를 어떻게 정하나요?</h2>
       <div className="cards2">
-        {[["높음", "var(--up)", "기사 30건 이상이고 어조가 일관될 때"],
-          ["보통", "var(--muted)", "기사 15건 이상이고 어조 차이가 크지 않을 때"],
-          ["낮음", "var(--warn)", "기사가 15건 미만이거나 어조가 크게 엇갈릴 때"]].map(([l, c, d]) => (
+        {[["높음", "var(--up)", "기사 30건 이상이고, 기사 간 어조 차이가 0.64 이하로 평소보다 일관될 때"],
+          ["보통", "var(--muted)", "기사 15건 이상이고, 기사 간 어조 차이가 0.72 이하일 때"],
+          ["낮음", "var(--warn)", "기사가 15건 미만이거나, 기사 간 어조 차이가 0.72를 넘어 크게 엇갈릴 때"]].map(([l, c, d]) => (
           <div className="panel" key={l} style={{ marginTop: 0 }}>
             <b style={{ color: c }}>{l}</b>
             <div className="cap">{d}</div>
           </div>
         ))}
+      </div>
+      <div className="note" style={{ lineHeight: 1.8 }}>
+        <b>두 가지를 따로 봅니다.</b> 하나는 기사 수(표본이 충분한가), 다른 하나는 기사 간 어조
+        차이(같은 날 기사들이 같은 방향을 말하는가)입니다.<br />
+        <b>어조 차이</b>는 그날 기사들의 감성 점수(−1~+1)가 서로 얼마나 다른지를 나타내는 표준편차입니다.
+        모델이 분명하게 판단한 기사에 더 큰 비중을 줍니다. 기사 수와 거의 상관없이 평소 0.64 안팎입니다.<br />
+        <b>기준값은 실제 운영 자료에서 정했습니다.</b> 2026년 7월 10일~10월 3일 중 기사가 15건 이상
+        모인 53일을 보면, 어조 차이의 중앙값이 0.64입니다. 그래서 이보다 일관된 날을 '높음'으로 둡니다.
+        상위 10% 경계가 0.72라서, 이를 넘는 날(열흘에 하루꼴로 유난히 엇갈린 날)을 '낮음'으로 둡니다.
+        기사 15건은 신호를 내기 위한 최소 표본이고, 30건은 '높음'에 필요한 표본입니다.<br />
+        이 기준은 2026년 10월 4일부터 쓰며, 경보 신호의 판정에도 똑같이 적용됩니다. 그전에는
+        신뢰구간 폭(0.60 이하)으로 판단했습니다. 하지만 신뢰구간은 기사 수가 늘면 저절로 좁아져서
+        기사 수를 두 번 따지는 문제가 있었습니다. 어조 차이 값이 없는 주 단위(과거) 구간은 예전 기준으로 표시합니다.
       </div>
 
       <details style={{ marginTop: 14 }}>
@@ -100,7 +113,7 @@ export default function News() {
           <table className="tbl">
             <thead>
               <tr><th>기준일</th><th>단위</th><th className="r">지수</th><th className="r">기사 수</th>
-                <th>신뢰구간 (95%)</th><th className="r">확신도</th></tr>
+                <th>신뢰구간 (95%)</th><th className="r">어조 차이</th><th className="r">확신도</th></tr>
             </thead>
             <tbody>
               {rows.map((r) => (
@@ -110,6 +123,7 @@ export default function News() {
                   <td className={`r ${r.index > 0 ? "pos" : "neg"}`}>{fmt(r.index)}</td>
                   <td className="r">{r.n_articles}</td>
                   <td>{r.ci_lo == null ? "기사 부족" : `${fmt(r.ci_lo)} ~ ${fmt(r.ci_hi)}`}</td>
+                  <td className="r">{r.score_sd == null ? "—" : fmt(r.score_sd, 2, false)}</td>
                   <td className="r">{fmt(r.confidence, 3, false)}</td>
                 </tr>
               ))}
@@ -117,8 +131,9 @@ export default function News() {
           </table>
         </div>
         <div className="note">
-          신뢰구간은 그 구간의 기사들을 무작위로 다시 뽑아 지수를 계산했을 때 나오는 범위입니다.
-          범위가 좁을수록 기사 간 어조가 일관됐다는 뜻입니다. 확신도는 모델이 각 문장을
+          신뢰구간은 그 구간의 기사들을 무작위로 다시 뽑아 지수를 계산했을 때 나오는 범위로,
+          기사 수가 많을수록 좁아집니다. 어조 차이는 기사들의 감성 점수가 서로 얼마나 다른지(표준편차)로,
+          신뢰도 판정에 쓰는 값입니다. 확신도는 모델이 각 문장을
           얼마나 분명하게 판단했는지를 0~1로 나타냅니다.
         </div>
       </details>
