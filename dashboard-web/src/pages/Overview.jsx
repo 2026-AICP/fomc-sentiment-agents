@@ -21,6 +21,8 @@ export default function Overview() {
   const lastAlert = alerts[alerts.length - 1];
   const g = gradeInfo(lastAlert.grade);
   const newsLabel = toneLabel(lastNews?.index);
+  const newsZ = lastCombined?.news_z != null && lastNews && lastCombined.date === lastNews.date
+    ? lastCombined.news_z : null;
 
   return (
     <>
@@ -46,14 +48,17 @@ export default function Overview() {
           </>}
           pill={fedSt?.badge} pillColor={fedSt?.final ? "var(--accent)" : "var(--muted)"}
           meta={fedSt ? `${fedSt.date} 회의 · ${fedSt.docsText}` : `${lastMeet.date} 회의`} />
+        {/* 연준 문서 칸과 같은 형식 — 통합 칸에 실제로 들어간 뉴스 표준화 점수를 크게, 원점수는
+            아래에 적는다(2026-10-04). 같은 날 통합값이 없으면 원점수만 보여 준다. */}
         <Kpi eyebrow="경제뉴스"
-          value={<>{fmt(lastNews?.index)}<span className="unit">원점수</span></>}
+          value={newsZ != null
+            ? <><span style={{ color: "var(--accent)" }}>{fmt(newsZ)}</span>
+                <span className="unit">표준화 점수</span></>
+            : <>{fmt(lastNews?.index)}<span className="unit">원점수</span></>}
           meta={lastNews
-            ? `${lastNews.date} · 기사 ${lastNews.n_articles}건${newsLabel ? ` · ${newsLabel.text}` : ""}`
-              // 통합 칸의 '뉴스' 값은 이 원점수를 표준화한 값이다(척도가 달라 다른 숫자로 보였다,
-              // 2026-10-04 지적). 같은 날이면 표준화 값을 함께 적어 두 칸을 잇는다.
-              + (lastCombined?.news_z != null && lastCombined.date === lastNews.date
-                ? ` · 표준화 ${fmt(lastCombined.news_z)}` : "")
+            ? `${lastNews.date} · 기사 ${lastNews.n_articles}건`
+              + (newsZ != null ? ` · 원점수 ${fmt(lastNews.index)}` : "")
+              + (newsLabel ? ` · ${newsLabel.text}` : "")
             : "수집 전"} />
         <Kpi eyebrow="최근 회의 신호"
           value={<span style={{ fontSize: 22, color: g.color }}>{g.label}</span>}
