@@ -79,3 +79,4 @@ date,kind,grade,fired,channel,n_recipients,n_failed,suppressed_reason
 2026-09-16,correction,⚠️ 주의,,dryrun,,,grade_unchanged
 2026-09-16,fed_minutes,⚠️ 주의,,email,4,0,
 2026-10-07,signal,⚪ 중립,,dryrun,,,grade_not_actionable
+2026-10-08,signal,⚪ 중립,,dryrun,,,grade_not_actionable
