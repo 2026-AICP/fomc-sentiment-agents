@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useJson, fmt, confidenceLevel } from "../lib/data";
+import { useJson, fmt, displayConfidence } from "../lib/data";
+import { ReliabilityToggle, useShowReliability } from "../components/ReliabilityToggle";
 import { Panel } from "../components/ui";
 import { IndexArea } from "../components/charts";
 
 export default function News() {
+  const [showRel, toggleRel] = useShowReliability();
   const { data: news } = useJson("news_daily");
   const [showAll, setShowAll] = useState(false);   // 일별 표: 기본 최근 7일
   if (!news) return <div className="loading">데이터를 불러오는 중입니다.</div>;
@@ -24,21 +26,23 @@ export default function News() {
         <IndexArea data={news} y="index" color="var(--blue)" />
       </Panel>
 
-      <h2 className="sec">일별 지수</h2>
+      <h2 className="sec" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        일별 지수 <ReliabilityToggle show={showRel} onToggle={toggleRel} />
+      </h2>
       <div className="panel tbl-wrap">
         <table className="tbl">
           <thead>
-            <tr><th>일자</th><th className="r">지수</th><th className="r">기사 수</th><th>신뢰도</th></tr>
+            <tr><th>일자</th><th className="r">지수</th><th className="r">기사 수</th>{showRel && <th>신뢰도</th>}</tr>
           </thead>
           <tbody>
             {visible.map((r) => {
-              const c = confidenceLevel(r.n_articles, r.ci_lo, r.ci_hi, r.score_sd);
+              const c = displayConfidence(r.date, r.n_articles, r.ci_lo, r.ci_hi, r.score_sd);
               return (
                 <tr key={r.date}>
                   <td>{r.date}</td>
                   <td className={`r ${r.index > 0 ? "pos" : "neg"}`}>{fmt(r.index)}</td>
                   <td className="r">{r.n_articles}</td>
-                  <td style={{ color: c.color, fontWeight: 600 }}>{c.label}</td>
+                  {showRel && <td style={{ color: c.color, fontWeight: 600 }}>{c.label}</td>}
                 </tr>
               );
             })}

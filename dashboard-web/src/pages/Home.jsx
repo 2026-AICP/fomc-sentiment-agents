@@ -1,5 +1,6 @@
+import { ReliabilityToggle, useShowReliability } from "../components/ReliabilityToggle";
 import {
-  useJson, fmt, gradeInfo, confidenceLevel, firedNames, FIRED_KO,
+  useJson, fmt, gradeInfo, displayConfidence, firedNames, FIRED_KO,
 } from "../lib/data";
 import { fedAxisStatus } from "../lib/fedAxis";
 import { homeIndex } from "../lib/homeIndex";
@@ -35,6 +36,7 @@ function Spark({ values, w = 168, h = 46, color = "var(--accent)", zero = true }
 const SIGNAL_CODES = ["tone_shift", "divergence", "tone_vs_vix", "tone_vs_rate"];
 
 export default function Home() {
+  const [showRel, toggleRel] = useShowReliability();
   const { data: dsAll } = useJson("daily_signals");     // 일별 통합 신호 (헤드라인의 근거)
   const { data: combined } = useJson("daily_headline");  // 통합 감성지수 = Fed:뉴스 1:1
   const { data: market } = useJson("market");
@@ -77,7 +79,7 @@ export default function Home() {
   const lastMeet = meetings[meetings.length - 1];
   const lastMn = minutes?.find((r) => r.date === lastMeet.date);
   const lastPr = presser?.find((r) => r.date === lastMeet.date);
-  const conf = confidenceLevel(ds.n_articles, ds.ci_lo, ds.ci_hi, ds.score_sd);
+  const conf = displayConfidence(ds.date, ds.n_articles, ds.ci_lo, ds.ci_hi, ds.score_sd);
 
   const recent = (key) => {
     const out = [];
@@ -199,12 +201,20 @@ export default function Home() {
           <div className="drow"><span>기자회견</span><N v={lastPr?.presser} pending={!fedSt?.final} /></div>
         </div>
         <div className="card dcard ev-pad">
-          <h3>뉴스 감성 신뢰도</h3>
+          <h3 style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            뉴스 감성 신뢰도
+            <ReliabilityToggle show={showRel} onToggle={toggleRel} />
+          </h3>
           <div className="drow"><span>기사 수</span><span>{ds.n_articles ?? "—"}건</span></div>
-          <div className="drow"><span>신뢰구간(CI)</span>
-            <span className="num">[{fmt(ds.ci_lo, 2)}, {fmt(ds.ci_hi, 2)}]</span></div>
-          <div className="drow"><span>판정</span>
-            <b style={{ color: conf.color, fontSize: 12.5 }}>{conf.label}</b></div>
+          {showRel ? (<>
+            <div className="drow"><span>신뢰구간(CI)</span>
+              <span className="num">[{fmt(ds.ci_lo, 2)}, {fmt(ds.ci_hi, 2)}]</span></div>
+            <div className="drow"><span>판정</span>
+              <b style={{ color: conf.color, fontSize: 12.5 }}>{conf.label}</b></div>
+            <div className="cap" style={{ marginTop: 4 }}>{conf.why}</div>
+          </>) : (
+            <div className="cap" style={{ marginTop: 4 }}>신뢰도 판정은 '신뢰도 보기'에서 확인할 수 있습니다.</div>
+          )}
         </div>
         <div className="card dcard ev-pad">
           <h3>보조 시장지표</h3>
