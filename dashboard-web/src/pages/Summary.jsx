@@ -1,4 +1,5 @@
-import { useJson, fmt, toneLabel, confidenceLevel } from "../lib/data";
+import { useJson, fmt, toneLabel, displayConfidence } from "../lib/data";
+import { ReliabilityToggle, useShowReliability } from "../components/ReliabilityToggle";
 import { fedAxisStatus } from "../lib/fedAxis";
 
 /** 부호에 따라 색을 주는 숫자. 값이 없으면 '대기'(아직 안 온 축) 또는 '—'. */
@@ -46,6 +47,7 @@ function Spark({ values, w = 300, h = 44, color = "var(--accent)", zero = true, 
 }
 
 export default function Summary() {
+  const [showRel, toggleRel] = useShowReliability();
   const { data: daily } = useJson("news_daily");        // 뉴스 단독 — 기사 수·CI 용
   const { data: combined } = useJson("daily_headline"); // 통합 = 뉴스 : Fed(1:1:1) = 1:1
   const { data: alerts } = useJson("alerts");
@@ -107,7 +109,7 @@ export default function Summary() {
   ];
 
   const lastLabel = toneLabel(last.index);
-  const conf = confidenceLevel(lastNews.n_articles, lastNews.ci_lo, lastNews.ci_hi, lastNews.score_sd);
+  const conf = displayConfidence(lastNews.date, lastNews.n_articles, lastNews.ci_lo, lastNews.ci_hi, lastNews.score_sd);
 
   return (
     <>
@@ -137,9 +139,11 @@ export default function Summary() {
                 )}
               </div>
               <div className="sub2" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span>신뢰도</span>
-                <b style={{ color: conf.color }}>{conf.label}</b>
-                <span style={{ opacity: 0.7 }}>· {conf.why}</span>
+                <ReliabilityToggle show={showRel} onToggle={toggleRel} />
+                {showRel && (<>
+                  <b style={{ color: conf.color }}>{conf.label}</b>
+                  <span style={{ opacity: 0.7 }}>· {conf.why}</span>
+                </>)}
               </div>
               {/* 표시값은 결합에 실제로 들어간 z 값이다. 뉴스 원값(-1~+1)을 그대로
                   보여주면 "1:1 결합"이 계산과 맞지 않아 보인다(2026-09 지적). */}

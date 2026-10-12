@@ -100,3 +100,21 @@ export const firedNames = (arr) =>
 // 백엔드 detail 문자열 앞의 이모지(🔼 등) 제거
 export const stripEmoji = (s) =>
   (s || "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").trim();
+
+
+// 화면 표시용 신뢰도 — 주말에 기사가 적은 날은 '낮음' 대신 '주말 · 기사 적음'(회색).
+// 신뢰도는 기본으로 접어 두고 '신뢰도 보기'로 펼친다(components/ReliabilityToggle).
+// 화면 표시만 바꾼다 — 경보 게이트(news_signals.confident)는 그대로다.
+const isWeekend = (date) => {
+  if (!date || date.length < 10) return false;
+  const d = new Date(`${date}T12:00:00Z`).getUTCDay();   // 수집일은 미국 날짜
+  return d === 0 || d === 6;
+};
+export const displayConfidence = (date, nArticles, ciLo, ciHi, scoreSd) => {
+  const c = confidenceLevel(nArticles, ciLo, ciHi, scoreSd);
+  if (c.label === "낮음" && isWeekend(date) && (Number(nArticles) || 0) < 15) {
+    return { label: "주말 · 기사 적음", color: "var(--muted)",
+      why: "주말에는 연준 관련 기사가 적어 참고용으로만 보세요" };
+  }
+  return c;
+};
