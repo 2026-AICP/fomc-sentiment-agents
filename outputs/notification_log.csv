@@ -85,3 +85,4 @@ date,kind,grade,fired,channel,n_recipients,n_failed,suppressed_reason
 2026-10-11,signal,⚪ 중립,,dryrun,,,no_market_data
 2026-10-12,signal,⚪ 관망,tone_shift,dryrun,,,grade_not_actionable
 2026-10-13,signal,⚪ 중립,,dryrun,,,grade_not_actionable
+2026-10-14,signal,🔴 경고,divergence;tone_vs_vix,email,4,0,
