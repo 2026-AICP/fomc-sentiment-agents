@@ -94,3 +94,4 @@ date,kind,grade,fired,channel,n_recipients,n_failed,suppressed_reason
 2026-10-20,signal,⚪ 관망,tone_shift,dryrun,,,grade_not_actionable
 2026-10-21,signal,⚪ 관망,tone_shift,dryrun,,,grade_not_actionable
 2026-10-22,signal,⚪ 관망,tone_shift;divergence;tone_vs_vix,dryrun,,,grade_not_actionable
+2026-10-23,signal,⚪ 중립,,dryrun,,,grade_not_actionable
