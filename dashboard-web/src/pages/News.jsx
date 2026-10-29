@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useJson, fmt, displayConfidence } from "../lib/data";
+import { useJson, fmt, displayConfidence, settled, collectingRow } from "../lib/data";
 import { ReliabilityToggle, useShowReliability } from "../components/ReliabilityToggle";
 import { Panel } from "../components/ui";
 import { IndexArea } from "../components/charts";
@@ -13,6 +13,7 @@ export default function News() {
 
   const rows = news.slice().reverse();
   const visible = showAll ? rows : rows.slice(0, 7);
+  const pending = collectingRow(news);
 
   return (
     <>
@@ -23,7 +24,7 @@ export default function News() {
       </p>
 
       <Panel cap="지수가 0보다 크면 낙관, 작으면 우려에 가까운 기사가 많았다는 뜻입니다. 기사 수가 적은 날은 값의 변동이 커질 수 있습니다.">
-        <IndexArea data={news} y="index" color="var(--blue)" />
+        <IndexArea data={settled(news)} y="index" color="var(--blue)" />
       </Panel>
 
       <h2 className="sec" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -39,10 +40,13 @@ export default function News() {
               const c = displayConfidence(r.date, r.n_articles, r.ci_lo, r.ci_hi, r.score_sd);
               return (
                 <tr key={r.date}>
-                  <td>{r.date}</td>
-                  <td className={`r ${r.index > 0 ? "pos" : "neg"}`}>{fmt(r.index)}</td>
+                  <td>{r.date}{r.collecting && <span style={{ marginLeft: 6, fontSize: 12, color: "var(--muted)" }}>집계 중</span>}</td>
+                  <td className={`r ${r.collecting ? "" : r.index > 0 ? "pos" : "neg"}`}
+                    style={r.collecting ? { color: "var(--muted)" } : undefined}>{fmt(r.index)}</td>
                   <td className="r">{r.n_articles}</td>
-                  {showRel && <td style={{ color: c.color, fontWeight: 600 }}>{c.label}</td>}
+                  {showRel && (r.collecting
+                    ? <td style={{ color: "var(--muted)", fontWeight: 600 }}>집계 중</td>
+                    : <td style={{ color: c.color, fontWeight: 600 }}>{c.label}</td>)}
                 </tr>
               );
             })}
@@ -58,6 +62,10 @@ export default function News() {
         )}
       </div>
       <div className="note">
+        {pending && <>
+          <b>집계 중</b>인 {pending.date} 행은 이번 수집 때까지 들어온 기사만 센 값으로,
+          다음 수집 때 하루치로 채워집니다. 그래프와 최근값에는 아직 넣지 않습니다.{" "}
+        </>}
         신뢰도는 그날 모인 기사 수와 기사 간 어조가 얼마나 일치하는지로 판단합니다.
         <b> 낮음</b>인 날은 지수는 그대로 보여드리되 신호는 내지 않습니다.
       </div>

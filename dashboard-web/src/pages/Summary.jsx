@@ -1,4 +1,4 @@
-import { useJson, fmt, toneLabel, displayConfidence } from "../lib/data";
+import { useJson, fmt, toneLabel, displayConfidence, settled } from "../lib/data";
 import { ReliabilityToggle, useShowReliability } from "../components/ReliabilityToggle";
 import { fedAxisStatus } from "../lib/fedAxis";
 
@@ -65,8 +65,9 @@ export default function Summary() {
 
   // 통합 감성지수 = News : Fed = 1:1 (Fed 내부는 성명문:회의록:기자회견 = 1:1:1).
   // 신뢰도는 그날 뉴스 표본으로 판정한다 — 통합값이 흔들리는 원인은 뉴스 쪽이기 때문.
-  const series = combined.map((d) => d.index).filter((v) => v != null).slice(-30);
-  const last = combined[combined.length - 1] || {};
+  const done = settled(combined);   // 집계 중인 날(기사 몇 건뿐)은 최근값에서 뺀다
+  const series = done.map((d) => d.index).filter((v) => v != null).slice(-30);
+  const last = done[done.length - 1] || {};
   const fedSt = fedAxisStatus(axis, last.date);
   const lastNews = daily.find((d) => d.date === last.date) || daily[daily.length - 1] || {};
   const rows = alerts.slice(-8).reverse();
