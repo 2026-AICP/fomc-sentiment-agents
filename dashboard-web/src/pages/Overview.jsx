@@ -1,4 +1,4 @@
-import { useJson, fmt, gradeInfo, toneLabel, firedNames, stripEmoji } from "../lib/data";
+import { useJson, fmt, gradeInfo, toneLabel, firedNames, stripEmoji, settled, collectingRow } from "../lib/data";
 import { Kpi, Panel, Pill } from "../components/ui";
 import { IndexArea } from "../components/charts";
 import { fedAxisStatus } from "../lib/fedAxis";
@@ -12,12 +12,16 @@ export default function Overview() {
   if (!meetings || !alerts) return <div className="loading">데이터를 불러오는 중입니다.</div>;
 
   const lastMeet = meetings[meetings.length - 1];
-  const lastCombined = combined?.[combined.length - 1];
+  // 최근값은 하루가 다 찬 날(홈과 같은 날짜). 집계 중인 날은 기사 수만 따로 알린다.
+  const doneCombined = settled(combined);
+  const lastCombined = doneCombined[doneCombined.length - 1];
   // 연준 값은 도착한 문서만으로 계산된 표준화 점수다. 문서별 원점수를 옆에 적으면 척도가
   // 달라 "성명문만 있는데 왜 값이 다르냐"로 읽힌다(2026-09-16 회의 지적) — 원점수 대신
   // 어떤 문서가 들어갔는지(✓/대기)와 잠정·확정 여부를 보여준다. 원점수는 FOMC 탭에 있다.
   const fedSt = fedAxisStatus(axis, lastCombined?.date);
-  const lastNews = news?.[news.length - 1];
+  const doneNews = settled(news);
+  const lastNews = doneNews[doneNews.length - 1];
+  const pending = collectingRow(news);
   const lastAlert = alerts[alerts.length - 1];
   const g = gradeInfo(lastAlert.grade);
   const newsLabel = toneLabel(lastNews?.index);
@@ -59,6 +63,7 @@ export default function Overview() {
             ? `${lastNews.date} · 기사 ${lastNews.n_articles}건`
               + (newsZ != null ? ` · 원점수 ${fmt(lastNews.index)}` : "")
               + (newsLabel ? ` · ${newsLabel.text}` : "")
+              + (pending ? ` · ${pending.date} 집계 중 ${pending.n_articles}건` : "")
             : "수집 전"} />
         <Kpi eyebrow="최근 회의 신호"
           value={<span style={{ fontSize: 22, color: g.color }}>{g.label}</span>}
@@ -67,7 +72,7 @@ export default function Overview() {
 
       <h2 className="sec">통합 감성지수 추이 (일별)</h2>
       <Panel cap="연준 문서(성명문·회의록·기자회견 1:1:1)와 경제뉴스를 1:1로 결합한 일별 지수입니다. 0이 과거 평균이며, 문서별 톤은 FOMC 탭에서 볼 수 있습니다.">
-        <IndexArea data={combined || []} y="index" color="var(--accent)" />
+        <IndexArea data={doneCombined} y="index" color="var(--accent)" />
       </Panel>
 
       <h2 className="sec">최근 회의 신호</h2>

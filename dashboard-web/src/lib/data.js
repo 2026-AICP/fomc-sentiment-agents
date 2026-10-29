@@ -102,6 +102,15 @@ export const stripEmoji = (s) =>
   (s || "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "").trim();
 
 
+// 집계 중인 날 — 수집이 UTC 자정을 넘겨 돌면 그 사이 기사 몇 건이 다음 날짜로 따로
+// 잡힌다(export_dashboard._signal_day). 행은 보여 주되 최근값·차트에서는 뺀다.
+export const settled = (rows) => (rows || []).filter((r) => !r.collecting);
+export const collectingRow = (rows) => {
+  const r = rows?.[rows.length - 1];
+  return r?.collecting ? r : null;
+};
+
+
 // 화면 표시용 신뢰도 — 주말에 기사가 적은 날은 '낮음' 대신 '주말 · 기사 적음'(회색).
 // 신뢰도는 기본으로 접어 두고 '신뢰도 보기'로 펼친다(components/ReliabilityToggle).
 // 화면 표시만 바꾼다 — 경보 게이트(news_signals.confident)는 그대로다.

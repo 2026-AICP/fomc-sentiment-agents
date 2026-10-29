@@ -76,6 +76,22 @@ def export_alerts(con):
 from analysis.news_index_live import NEWS_LIVE_FROM  # noqa: E402
 
 
+def _signal_day():
+    """에이전트가 마지막으로 신호를 낸 날 = 그 수집 시점의 미국(ET) 오늘.
+
+    뉴스는 UTC 날짜로 묶는데 수집은 한국 아침(UTC 자정 전후)에 돈다. 수집이 UTC 자정을
+    넘기면 그 사이 나온 기사 몇 건이 '내일' 날짜로 따로 잡힌다(2026-10-29: 10/29 기사 1건,
+    통합 +3.38). 그날은 아직 집계 중이라 행은 그대로 보여 주되 collecting 으로 표시해
+    화면이 최근값·차트에서 빼게 한다 — 다음 수집 때 하루치로 채워진다.
+    """
+    rows = _csv_rows(ROOT / "outputs" / "daily_signals.csv")
+    return max((r["date"] for r in rows), default=None)
+
+
+def _collecting(date, signal_day):
+    return bool(signal_day) and date > signal_day
+
+
 def _news_row(r, period):
     return {"date": r["date"], "n_articles": int(r["n_articles"]),
             "index": _f(r["conf_weighted"]), "ci_lo": _f(r["ci_lo"]),
@@ -109,7 +125,8 @@ def export_news_daily():
     #   CSV 의 끝 날짜에 기대고 있었다.
     bf = [_news_row(r, "weekly") for r in _csv_rows(bf_csv)
           if r["date"] < NEWS_LIVE_FROM]
-    live = [_news_row(r, "daily")
+    sig = _signal_day()
+    live = [{**_news_row(r, "daily"), "collecting": _collecting(r["date"], sig)}
             for r in _csv_rows(ROOT / "outputs" / "news_index_live.csv")
             if r["date"] >= NEWS_LIVE_FROM]
     return bf + live
@@ -131,11 +148,13 @@ def export_daily_headline():
     둘을 함께 내보내야 화면에서 index = 0.5·fed + 0.5·news_z 가 검산된다
     (원값 news 만 보여주다 "계산이 안 맞는다"는 지적을 받았다, 2026-09-05).
     """
+    sig = _signal_day()
     return [{"date": r["date"], "index": _f(r["headline"]),
              "fed": _f(r["fed_carry"]), "news": _f(r["news"]),
              "news_z": _f(r["news_z"]) if r.get("news_z") else None,
              "method": r.get("method") or None,
-             "n_articles": int(r["n_articles"]) if r.get("n_articles") else None}
+             "n_articles": int(r["n_articles"]) if r.get("n_articles") else None,
+             "collecting": _collecting(r["date"], sig)}
             for r in _csv_rows(ROOT / "outputs" / "daily_headline.csv")]
 
 
