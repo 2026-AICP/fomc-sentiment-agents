@@ -309,3 +309,4 @@ as_of,date,statement,minutes,presser,combined,grade,fired,n_axes
 2026-10-31,2026-10-30,,,,0.748194,🔴 경고,tone_shift;divergence;tone_vs_vix,0
 2026-11-01,2026-10-31,,,,-0.603417,⚪ 관망,tone_shift,0
 2026-11-02,2026-11-01,,,,1.19597,⚪ 관망,tone_shift,0
+2026-11-03,2026-11-02,,,,0.940196,⚪ 관망,tone_vs_vix,0
