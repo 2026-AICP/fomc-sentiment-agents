@@ -122,3 +122,6 @@ date,kind,grade,fired,channel,n_recipients,n_failed,suppressed_reason
 2026-10-28,signal,🟢 정합,,dryrun,,,not_today
 2026-10-28,fed_meeting,🟢 정합,,dryrun,,,not_today
 2026-11-04,signal,🟢 정합,,dryrun,,,grade_not_actionable
+2026-10-28,signal,🟢 정합,,dryrun,,,not_today
+2026-10-28,fed_meeting,🟢 정합,,dryrun,,,not_today
+2026-11-05,signal,⚪ 관망,divergence;tone_vs_vix,dryrun,,,grade_not_actionable
