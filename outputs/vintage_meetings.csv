@@ -313,3 +313,4 @@ as_of,date,statement,minutes,presser,combined,grade,fired,n_axes
 2026-11-04,2026-11-03,,,,0.727121,🟢 정합,,0
 2026-11-05,2026-11-04,,,,0.768217,🟢 정합,,0
 2026-11-06,2026-11-05,,,,1.43367,⚪ 관망,divergence;tone_vs_vix,0
+2026-11-07,2026-11-06,,,,2.8401,⚪ 관망,tone_shift,0
