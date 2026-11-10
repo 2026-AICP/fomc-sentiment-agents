@@ -134,3 +134,6 @@ date,kind,grade,fired,channel,n_recipients,n_failed,suppressed_reason
 2026-10-28,signal,🟢 정합,,dryrun,,,not_today
 2026-10-28,fed_meeting,🟢 정합,,dryrun,,,not_today
 2026-11-08,signal,⚪ 관망,tone_shift,dryrun,,,no_market_data
+2026-10-28,signal,🟢 정합,,dryrun,,,not_today
+2026-10-28,fed_meeting,🟢 정합,,dryrun,,,not_today
+2026-11-09,signal,⚪ 관망,tone_shift,dryrun,,,grade_not_actionable
