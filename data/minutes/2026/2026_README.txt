@@ -6,3 +6,6 @@ PVCCEO: Participants' Views on Current Conditions and the Economic Outlook
 CPA: Committee Policy Action
 
 #Asterisks(*) used to indicate contents existing in addition to the six repetitive ones.
+
+20261028
+*PDCCEOMPC: Policymakers' Discussion of Current Conditions, the Economic Outlook, and Monetary Policy Considerations
