@@ -169,3 +169,4 @@ date,kind,grade,fired,channel,n_recipients,n_failed,suppressed_reason
 2026-11-19,signal,🟢 정합,,dryrun,,,grade_not_actionable
 2026-11-20,signal,🟢 정합,,dryrun,,,grade_not_actionable
 2026-11-21,signal,⚪ 중립,,dryrun,,,no_market_data
+2026-11-22,signal,⚪ 중립,,dryrun,,,no_market_data
